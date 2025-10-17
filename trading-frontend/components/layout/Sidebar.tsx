@@ -11,12 +11,14 @@ import {
   Webhook,
   BarChart3,
   LogOut,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'next-auth/react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Strategies', href: '/strategies', icon: Zap },
   { name: 'Trading Settings', href: '/settings', icon: Settings },
   { name: 'API Keys', href: '/api-keys', icon: Key },
   { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },

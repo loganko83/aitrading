@@ -37,7 +37,7 @@ import { TRADINGVIEW_ALERT_TEMPLATE, CUSTOM_ALERT_TEMPLATE } from '@/lib/webhook
 const webhookSchema = z.object({
   name: z.string().min(1, '이름을 입력하세요').max(100),
   description: z.string().max(500).optional(),
-  is_active: z.boolean().default(true),
+  is_active: z.boolean(),
 });
 
 type WebhookFormData = z.infer<typeof webhookSchema>;

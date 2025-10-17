@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getServerSession } from '@/lib/auth';
 import { z } from 'zod';
 
 // Validation schema
@@ -17,7 +16,7 @@ const settingsSchema = z.object({
 // GET endpoint - Retrieve user settings
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -57,7 +56,7 @@ export async function GET(req: NextRequest) {
 // POST endpoint - Save/Update settings
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -76,7 +75,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error: 'Validation failed',
-          details: validationResult.error.errors
+          details: validationResult.error.issues
         },
         { status: 400 }
       );

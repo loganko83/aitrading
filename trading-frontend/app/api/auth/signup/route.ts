@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import speakeasy from 'speakeasy';
 
+interface SignupRequestBody {
+  name: string
+  email: string
+  password: string
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json();
+    const { name, email, password }: SignupRequestBody = await request.json();
 
     // Validation
     if (!name || !email || !password) {
@@ -78,10 +84,11 @@ export async function POST(request: NextRequest) {
       otpSecret: otpSecret.base32,
       otpQRCode: otpSecret.otpauth_url, // QR code URL for Google Authenticator
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Signup error:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: message },
       { status: 500 }
     );
   }

@@ -148,7 +148,7 @@ export default function LoginPage() {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">
-                  Don't have an account?
+                  Don&apos;t have an account?
                 </span>
               </div>
             </div>

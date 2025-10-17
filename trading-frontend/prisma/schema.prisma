@@ -30,6 +30,7 @@ model User {
   trades        Trade[]
   webhooks      Webhook[]
   xpTransactions XpTransaction[]
+  strategyConfigs StrategyConfig[]
 
   // Gamification fields
   totalXp       Int      @default(0)
@@ -209,5 +210,139 @@ model XpTransaction {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([createdAt])
+}
+
+// 전략 템플릿 (기본 제공 + 사용자 커스텀)
+model Strategy {
+  id                String   @id @default(cuid())
+  name              String   // "Aggressive AI Ensemble", "Conservative TA"
+  description       String   @db.Text
+  category          String   @default("AI_ENSEMBLE") // AI_ENSEMBLE, TECHNICAL, FUNDAMENTAL, HYBRID
+  isPublic          Boolean  @default(true) // 공개 템플릿 여부
+  creatorId         String?  // NULL = 시스템 기본 전략
+
+  // AI 모델 가중치
+  mlWeight          Float    @default(0.40) // 40%
+  gpt4Weight        Float    @default(0.25) // 25%
+  claudeWeight      Float    @default(0.25) // 25%
+  taWeight          Float    @default(0.10) // 10%
+
+  // 진입 조건
+  minProbability    Float    @default(0.80) // 80% 이상
+  minConfidence     Float    @default(0.70) // 70% 이상
+  minAgreement      Float    @default(0.70) // 70% 일치도
+
+  // 리스크 관리
+  defaultLeverage   Int      @default(3)
+  positionSizePct   Float    @default(0.10) // 10%
+  slAtrMultiplier   Float    @default(2.0) // Stop-Loss ATR 배수
+  tpAtrMultiplier   Float    @default(3.0) // Take-Profit ATR 배수
+  maxOpenPositions  Int      @default(3)
+
+  // 기술적 지표 설정
+  atrPeriod         Int      @default(14)
+  rsiPeriod         Int      @default(14)
+  macdFast          Int      @default(12)
+  macdSlow          Int      @default(26)
+  macdSignal        Int      @default(9)
+
+  // 통계
+  usageCount        Int      @default(0)
+  avgWinRate        Float?
+  avgPnl            Float?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  configs           StrategyConfig[]
+  backtestResults   BacktestResult[]
+
+  @@index([category])
+  @@index([isPublic])
+  @@index([creatorId])
+}
+
+// 사용자별 전략 설정 (Strategy를 기반으로 커스터마이징)
+model StrategyConfig {
+  id                String   @id @default(cuid())
+  userId            String
+  strategyId        String
+  name              String   // 사용자 지정 이름
+  isActive          Boolean  @default(false)
+
+  // 사용자 커스텀 파라미터 (Strategy 템플릿 덮어쓰기)
+  customParams      Json?    // 사용자가 수정한 파라미터들
+
+  // 실행 통계
+  totalTrades       Int      @default(0)
+  winRate           Float?
+  totalPnl          Float    @default(0)
+  maxDrawdown       Float?
+  sharpeRatio       Float?
+
+  // 자동 거래 설정
+  autoTradeEnabled  Boolean  @default(false)
+  selectedSymbols   String[] @default(["BTCUSDT"])
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastUsedAt        DateTime?
+
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy          Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, strategyId]) // 사용자당 전략별 1개의 설정
+  @@index([userId])
+  @@index([strategyId])
+  @@index([isActive])
+}
+
+// 백테스팅 결과
+model BacktestResult {
+  id                String   @id @default(cuid())
+  userId            String
+  strategyId        String
+
+  // 백테스트 설정
+  symbol            String
+  interval          String   // 1h, 4h, 1d
+  startDate         DateTime
+  endDate           DateTime
+  initialCapital    Float    @default(10000)
+
+  // 백테스트 결과
+  totalTrades       Int
+  winningTrades     Int
+  losingTrades      Int
+  winRate           Float
+  totalPnl          Float
+  totalPnlPct       Float
+  maxDrawdown       Float
+  maxDrawdownPct    Float
+  sharpeRatio       Float?
+  sortinoRatio      Float?
+  profitFactor      Float?
+  avgWinPnl         Float?
+  avgLossPnl        Float?
+  largestWin        Float?
+  largestLoss       Float?
+
+  // 자세한 거래 내역 (JSON 배열)
+  trades            Json     // [{entry, exit, pnl, reason}, ...]
+
+  // 차트 데이터 (Equity Curve)
+  equityCurve       Json     // [{timestamp, equity}, ...]
+
+  createdAt         DateTime @default(now())
+
+  // Relations
+  strategy          Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([strategyId])
+  @@index([symbol])
   @@index([createdAt])
 }

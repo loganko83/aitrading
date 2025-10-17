@@ -1,6 +1,39 @@
-import NextAuth, { AuthOptions } from 'next-auth';
+import NextAuth, { User } from 'next-auth';
+import type { NextAuthConfig } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
+
+// Extend the built-in session types
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      xp_points: number;
+      level: number;
+      google_otp_enabled: boolean;
+    };
+  }
+
+  interface User {
+    id: string;
+    email: string;
+    name: string;
+    xp_points: number;
+    level: number;
+    google_otp_enabled: boolean;
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id: string;
+    xp_points: number;
+    level: number;
+    google_otp_enabled: boolean;
+  }
+}
 
 // This would normally come from a database
 // For now, we'll create a mock user lookup function
@@ -26,7 +59,7 @@ async function getUserByEmail(email: string) {
   return null;
 }
 
-export const authOptions: AuthOptions = {
+export const authOptions: NextAuthConfig = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -40,14 +73,14 @@ export const authOptions: AuthOptions = {
           throw new Error('Email and password required');
         }
 
-        const user = await getUserByEmail(credentials.email);
+        const user = await getUserByEmail(credentials.email as string);
 
         if (!user) {
           throw new Error('Invalid credentials');
         }
 
         // Verify password
-        const isValidPassword = await compare(credentials.password, user.password);
+        const isValidPassword = await compare(credentials.password as string, user.password);
         if (!isValidPassword) {
           throw new Error('Invalid credentials');
         }
@@ -64,7 +97,7 @@ export const authOptions: AuthOptions = {
           const isValidOTP = speakeasy.totp.verify({
             secret: user.google_otp_secret,
             encoding: 'base32',
-            token: credentials.otp,
+            token: credentials.otp as string,
             window: 2, // Allow 2 time steps before/after
           });
 
@@ -93,9 +126,12 @@ export const authOptions: AuthOptions = {
     error: '/login',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
+      // On initial sign in, add user data to token
       if (user) {
         token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
         token.xp_points = user.xp_points;
         token.level = user.level;
         token.google_otp_enabled = user.google_otp_enabled;
@@ -103,11 +139,14 @@ export const authOptions: AuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.xp_points = token.xp_points as number;
-        session.user.level = token.level as number;
-        session.user.google_otp_enabled = token.google_otp_enabled as boolean;
+      // Add token data to session
+      if (token && session.user) {
+        session.user.id = token.id;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
+        session.user.xp_points = token.xp_points;
+        session.user.level = token.level;
+        session.user.google_otp_enabled = token.google_otp_enabled;
       }
       return session;
     },
@@ -119,6 +158,7 @@ export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-const handler = NextAuth(authOptions);
+// Create NextAuth handlers
+const { handlers } = NextAuth(authOptions);
 
-export { handler as GET, handler as POST };
+export const { GET, POST } = handlers;

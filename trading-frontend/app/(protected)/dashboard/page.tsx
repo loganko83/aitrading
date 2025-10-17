@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import StatsWidget from '@/components/trading/StatsWidget';
-import PositionCard from '@/components/trading/PositionCard';
+import PositionMonitor from '@/components/trading/PositionMonitor';
 import TradingChart from '@/components/trading/TradingChart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,13 +29,19 @@ export default function DashboardPage() {
   useEffect(() => {
     // Simulate loading dashboard data
     const mockStats = {
-      total_balance: 10500.00,
+      total_equity: 10500.00,
       available_balance: 7200.00,
+      margin_used: 3300.00,
       total_pnl: 850.00,
-      daily_pnl: 125.50,
-      win_rate: 68.5,
+      total_pnl_pct: 8.82,
+      today_pnl: 125.50,
+      today_pnl_pct: 1.21,
+      open_positions: 3,
       total_trades: 47,
-      active_positions: 3,
+      win_rate: 68.5,
+      xp_points: 1250,
+      level: 8,
+      next_level_xp: 1500,
     };
 
     const mockPositions: Position[] = [
@@ -47,14 +53,32 @@ export default function DashboardPage() {
         quantity: 0.025,
         entry_price: 42000,
         current_price: 43500,
-        stop_loss: 40500,
-        take_profit: 45000,
+        sl_price: 40500,
+        tp_price: 45000,
         leverage: 5,
-        unrealized_pnl: 37.50,
+        current_pnl: 37.50,
+        current_pnl_pct: 3.57,
         status: 'OPEN',
         opened_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-        closed_at: null,
-        ai_confidence: 0.85,
+        closed_at: undefined,
+        ai_analysis: {
+          P_up_final: 0.75,
+          P_down_final: 0.25,
+          confidence: 0.85,
+          model_agreement: 0.82,
+          breakdown: {
+            ml: { prob: 0.78, conf: 0.88, weight: 0.30 },
+            gpt: { prob: 0.72, conf: 0.85, weight: 0.25 },
+            llama: { prob: 0.76, conf: 0.83, weight: 0.25 },
+            ta: { prob: 0.74, conf: 0.82, weight: 0.20 },
+          },
+          reasoning: {
+            ml: 'Strong bullish momentum indicators',
+            gpt: 'Positive market sentiment and news',
+            llama: 'Technical breakout pattern detected',
+            ta: 'RSI and MACD showing bullish divergence',
+          },
+        },
       },
       {
         id: '2',
@@ -64,14 +88,32 @@ export default function DashboardPage() {
         quantity: 0.5,
         entry_price: 2280,
         current_price: 2350,
-        stop_loss: 2200,
-        take_profit: 2450,
+        sl_price: 2200,
+        tp_price: 2450,
         leverage: 5,
-        unrealized_pnl: 35.00,
+        current_pnl: 35.00,
+        current_pnl_pct: 3.07,
         status: 'OPEN',
         opened_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-        closed_at: null,
-        ai_confidence: 0.78,
+        closed_at: undefined,
+        ai_analysis: {
+          P_up_final: 0.68,
+          P_down_final: 0.32,
+          confidence: 0.78,
+          model_agreement: 0.75,
+          breakdown: {
+            ml: { prob: 0.70, conf: 0.80, weight: 0.30 },
+            gpt: { prob: 0.65, conf: 0.75, weight: 0.25 },
+            llama: { prob: 0.69, conf: 0.78, weight: 0.25 },
+            ta: { prob: 0.68, conf: 0.79, weight: 0.20 },
+          },
+          reasoning: {
+            ml: 'Moderate uptrend with volume support',
+            gpt: 'Ethereum ecosystem growth signals',
+            llama: 'Price consolidation near resistance',
+            ta: 'Moving averages in bullish alignment',
+          },
+        },
       },
       {
         id: '3',
@@ -81,14 +123,32 @@ export default function DashboardPage() {
         quantity: 5,
         entry_price: 105,
         current_price: 102,
-        stop_loss: 108,
-        take_profit: 98,
+        sl_price: 108,
+        tp_price: 98,
         leverage: 5,
-        unrealized_pnl: 15.00,
+        current_pnl: 15.00,
+        current_pnl_pct: 2.86,
         status: 'OPEN',
         opened_at: new Date(Date.now() - 3600000).toISOString(),
-        closed_at: null,
-        ai_confidence: 0.82,
+        closed_at: undefined,
+        ai_analysis: {
+          P_up_final: 0.35,
+          P_down_final: 0.65,
+          confidence: 0.82,
+          model_agreement: 0.80,
+          breakdown: {
+            ml: { prob: 0.32, conf: 0.85, weight: 0.30 },
+            gpt: { prob: 0.38, conf: 0.80, weight: 0.25 },
+            llama: { prob: 0.34, conf: 0.82, weight: 0.25 },
+            ta: { prob: 0.36, conf: 0.81, weight: 0.20 },
+          },
+          reasoning: {
+            ml: 'Bearish momentum with selling pressure',
+            gpt: 'Negative market sentiment for Solana',
+            llama: 'Technical breakdown below support',
+            ta: 'RSI oversold but trend still bearish',
+          },
+        },
       },
     ];
 
@@ -107,11 +167,6 @@ export default function DashboardPage() {
   const handleToggleAutoTrading = () => {
     toggleAutoTrading();
     // TODO: Implement actual auto-trading toggle API call
-  };
-
-  const handleClosePosition = async (positionId: string) => {
-    // TODO: Implement position closing logic
-    console.log('Closing position:', positionId);
   };
 
   return (
@@ -180,7 +235,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsWidget
           title="Total Balance"
-          value={`$${dashboardStats?.total_balance.toLocaleString() || '0'}`}
+          value={`$${dashboardStats?.total_equity.toLocaleString() || '0'}`}
           icon="wallet"
         />
         <StatsWidget
@@ -191,8 +246,8 @@ export default function DashboardPage() {
         <StatsWidget
           title="Total PnL"
           value={`$${dashboardStats?.total_pnl.toLocaleString() || '0'}`}
-          change={`+${dashboardStats?.daily_pnl.toLocaleString() || '0'} today`}
-          changeType={dashboardStats && dashboardStats.daily_pnl >= 0 ? 'positive' : 'negative'}
+          change={`+${dashboardStats?.today_pnl.toLocaleString() || '0'} today`}
+          changeType={dashboardStats && dashboardStats.today_pnl >= 0 ? 'positive' : 'negative'}
           icon="trending-up"
         />
         <StatsWidget
@@ -209,51 +264,13 @@ export default function DashboardPage() {
         symbol="BTC/USDT"
         showPositionMarkers={positions.length > 0}
         entryPrice={positions.length > 0 ? positions[0].entry_price : undefined}
-        stopLoss={positions.length > 0 ? positions[0].stop_loss : undefined}
-        takeProfit={positions.length > 0 ? positions[0].take_profit : undefined}
+        stopLoss={positions.length > 0 ? positions[0].sl_price : undefined}
+        takeProfit={positions.length > 0 ? positions[0].tp_price : undefined}
         currentPrice={positions.length > 0 ? positions[0].current_price : undefined}
       />
 
-      {/* Active Positions */}
-      <div>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Active Positions</CardTitle>
-                <CardDescription>
-                  {positions.length} open position{positions.length !== 1 ? 's' : ''}
-                </CardDescription>
-              </div>
-              <Badge variant="outline">
-                {positions.length} / 10 max
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {positions.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground mb-4">No active positions</p>
-                <p className="text-sm text-muted-foreground">
-                  {isAutoTrading
-                    ? 'AI is monitoring markets for trading opportunities'
-                    : 'Start auto-trading to let AI open positions for you'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {positions.map((position) => (
-                  <PositionCard
-                    key={position.id}
-                    position={position}
-                    onClose={handleClosePosition}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Position Monitor - Real-time Position Monitoring */}
+      <PositionMonitor initialPositions={positions} autoRefresh={true} refreshInterval={5000} />
 
       {/* Recent Activity */}
       <Card>

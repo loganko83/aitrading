@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import speakeasy from 'speakeasy';
 
+interface VerifyOtpRequestBody {
+  userId: string
+  otpCode: string
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { userId, otpCode } = await request.json();
+    const { userId, otpCode }: VerifyOtpRequestBody = await request.json();
 
     if (!userId || !otpCode) {
       return NextResponse.json(
@@ -62,10 +67,11 @@ export async function POST(request: NextRequest) {
       success: true,
       message: '2FA enabled successfully',
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('OTP verification error:', error);
+    const message = error instanceof Error ? error.message : 'Verification failed'
     return NextResponse.json(
-      { error: error.message || 'Verification failed' },
+      { error: message },
       { status: 500 }
     );
   }

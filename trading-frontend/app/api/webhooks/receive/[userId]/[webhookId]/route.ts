@@ -15,10 +15,10 @@ const webhookEvents = new Map<string, any[]>();
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { userId: string; webhookId: string } }
+  { params }: { params: Promise<{ userId: string; webhookId: string }> }
 ) {
   try {
-    const { userId, webhookId } = params;
+    const { userId, webhookId } = await params;
 
     // Check rate limiting
     const rateLimit = checkWebhookRateLimit(webhookId, 60, 60000); // 60 requests per minute
@@ -161,9 +161,9 @@ export async function POST(
 // GET - Test endpoint to verify webhook is accessible
 export async function GET(
   req: NextRequest,
-  { params }: { params: { userId: string; webhookId: string } }
+  { params }: { params: Promise<{ userId: string; webhookId: string }> }
 ) {
-  const { userId, webhookId } = params;
+  const { userId, webhookId } = await params;
 
   return NextResponse.json({
     success: true,

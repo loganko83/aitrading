@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getServerSession } from '@/lib/auth';
 import { z } from 'zod';
-import { encryptApiKey, decryptApiKey } from '@/lib/encryption';
+import { encryptApiKey } from '@/lib/encryption';
+
+interface ApiKeyData {
+  id: string
+  userId: string
+  exchange: 'binance' | 'bybit'
+  apiKey: string
+  apiSecret: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
 
 // Mock storage (실제로는 Prisma 사용)
-const mockApiKeys = new Map<string, any[]>();
+const mockApiKeys = new Map<string, ApiKeyData[]>();
 
 const apiKeySchema = z.object({
   exchange: z.enum(['binance', 'bybit']),
@@ -16,7 +26,7 @@ const apiKeySchema = z.object({
 // GET - 사용자의 API 키 목록 조회
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -53,7 +63,7 @@ export async function GET(req: NextRequest) {
 // POST - 새 API 키 등록
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -67,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, error: result.error.errors[0].message },
+        { success: false, error: result.error.issues[0].message },
         { status: 400 }
       );
     }
@@ -115,7 +125,7 @@ export async function POST(req: NextRequest) {
 // DELETE - API 키 삭제
 export async function DELETE(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(

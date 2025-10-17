@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getServerSession } from '@/lib/auth';
 import type { LeaderboardEntry, Badge } from '@/types';
 import { calculateLevel, getLevelTitle, AVAILABLE_BADGES } from '@/lib/gamification';
 
@@ -78,7 +77,7 @@ const generateMockLeaderboard = (currentUserEmail: string): LeaderboardEntry[] =
 // GET endpoint - Retrieve leaderboard with pagination
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(

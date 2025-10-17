@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getServerSession } from '@/lib/auth';
 import { z } from 'zod';
 import { generateWebhookId, generateWebhookSecret, generateWebhookUrl } from '@/lib/webhook';
 import type { Webhook } from '@/types';
@@ -18,7 +17,7 @@ const mockWebhooks: Map<string, Webhook[]> = new Map();
 // GET - List user webhooks
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -45,7 +44,7 @@ export async function GET(req: NextRequest) {
 // POST - Create new webhook
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -64,7 +63,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error: 'Validation failed',
-          details: validationResult.error.errors,
+          details: validationResult.error.issues,
         },
         { status: 400 }
       );
@@ -117,7 +116,7 @@ export async function POST(req: NextRequest) {
 // DELETE - Delete webhook
 export async function DELETE(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
 
     if (!session?.user?.email) {
       return NextResponse.json(

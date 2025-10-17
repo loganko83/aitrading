@@ -80,12 +80,18 @@ async def shutdown_event():
 
 
 # Import and include API routers
-from app.api.v1 import trading, websocket as ws_router
+from app.api.v1 import trading, websocket as ws_router, strategies
 
 app.include_router(
     trading.router,
     prefix=f"{settings.API_V1_PREFIX}/trading",
     tags=["Trading"]
+)
+
+app.include_router(
+    strategies.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["Strategies"]
 )
 
 app.include_router(

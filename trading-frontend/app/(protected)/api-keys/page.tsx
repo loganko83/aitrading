@@ -66,7 +66,6 @@ export default function ApiKeysPage() {
     handleSubmit,
     formState: { errors },
     reset,
-    setValue,
   } = useForm<ApiKeysFormData>({
     resolver: zodResolver(apiKeysSchema),
   });
