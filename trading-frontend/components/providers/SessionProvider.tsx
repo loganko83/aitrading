@@ -8,5 +8,9 @@ interface Props {
 }
 
 export default function SessionProvider({ children }: Props) {
-  return <NextAuthSessionProvider>{children}</NextAuthSessionProvider>;
+  return (
+    <NextAuthSessionProvider>
+      {children}
+    </NextAuthSessionProvider>
+  );
 }

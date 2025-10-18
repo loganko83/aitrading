@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { apiPost } from '@/lib/utils/api-client';
 
 function VerifyOTPContent() {
   const router = useRouter();
@@ -55,13 +56,9 @@ function VerifyOTPContent() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          otpCode,
-        }),
+      const response = await apiPost('/api/auth/verify-otp', {
+        userId,
+        otpCode,
       });
 
       const result = await response.json();
