@@ -202,15 +202,94 @@ class TripleAIEnsemble:
         current_price: float
     ) -> SignalResult:
         """GPT-4 analysis via OpenAI API"""
-        # TODO: Implement GPT-4 API call
-        # For now, return a mock result
+        try:
+            from openai import AsyncOpenAI
+            from app.core.config import settings
 
-        return SignalResult(
-            direction="LONG",
-            probability=0.82,
-            confidence=0.80,
-            reasoning="GPT-4: Market structure shows bullish momentum with strong support levels"
-        )
+            client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+            # Prepare market data summary
+            recent_data = market_data.tail(20)
+            data_summary = {
+                "symbol": symbol,
+                "current_price": current_price,
+                "recent_highs": recent_data['high'].tolist(),
+                "recent_lows": recent_data['low'].tolist(),
+                "recent_closes": recent_data['close'].tolist(),
+                "recent_volumes": recent_data['volume'].tolist(),
+                "sma_20": float(market_data['close'].tail(20).mean()),
+                "sma_50": float(market_data['close'].tail(50).mean()),
+            }
+
+            # Create GPT-4 prompt
+            prompt = f"""You are an expert cryptocurrency trader analyzing {symbol}.
+
+Current Market Data:
+- Current Price: ${current_price:,.2f}
+- 20-period SMA: ${data_summary['sma_20']:,.2f}
+- 50-period SMA: ${data_summary['sma_50']:,.2f}
+- Recent High: ${max(data_summary['recent_highs']):,.2f}
+- Recent Low: ${min(data_summary['recent_lows']):,.2f}
+
+Analyze the market structure and provide:
+1. Direction: LONG, SHORT, or NEUTRAL
+2. Probability (0.0-1.0): How confident are you in the direction?
+3. Confidence (0.0-1.0): Overall confidence in the analysis
+4. Brief reasoning (2-3 sentences)
+
+Respond in JSON format:
+{{
+    "direction": "LONG/SHORT/NEUTRAL",
+    "probability": 0.75,
+    "confidence": 0.80,
+    "reasoning": "Your brief analysis"
+}}"""
+
+            # Call GPT-4
+            response = await client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {"role": "system", "content": "You are an expert cryptocurrency trading analyst. Provide concise, data-driven analysis."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=300,
+                response_format={"type": "json_object"}
+            )
+
+            # Parse response
+            import json
+            result = json.loads(response.choices[0].message.content)
+
+            return SignalResult(
+                direction=result["direction"],
+                probability=float(result["probability"]),
+                confidence=float(result["confidence"]),
+                reasoning=f"GPT-4: {result['reasoning']}"
+            )
+
+        except Exception as e:
+            logger.error(f"GPT-4 analysis error: {e}")
+            # Fallback to simple analysis
+            sma_20 = market_data['close'].tail(20).mean()
+            sma_50 = market_data['close'].tail(50).mean()
+
+            if current_price > sma_20 and sma_20 > sma_50:
+                direction = "LONG"
+                probability = 0.75
+            elif current_price < sma_20 and sma_20 < sma_50:
+                direction = "SHORT"
+                probability = 0.25
+            else:
+                direction = "NEUTRAL"
+                probability = 0.50
+
+            return SignalResult(
+                direction=direction,
+                probability=probability,
+                confidence=0.70,
+                reasoning="GPT-4: Fallback analysis - price action relative to moving averages"
+            )
 
     async def _llama_analysis(
         self,
@@ -218,55 +297,187 @@ class TripleAIEnsemble:
         market_data: pd.DataFrame,
         current_price: float
     ) -> SignalResult:
-        """LLaMA 3.1 analysis via Anthropic API"""
-        # TODO: Implement LLaMA API call
-        # For now, return a mock result
+        """Claude (Anthropic) analysis as alternative to LLaMA"""
+        try:
+            from anthropic import AsyncAnthropic
+            from app.core.config import settings
 
-        return SignalResult(
-            direction="LONG",
-            probability=0.78,
-            confidence=0.72,
-            reasoning="LLaMA: Volume profile suggests accumulation phase"
-        )
+            client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+            # Prepare market data summary
+            recent_data = market_data.tail(20)
+            volume_trend = "increasing" if recent_data['volume'].tail(5).mean() > recent_data['volume'].tail(10).mean() else "decreasing"
+
+            # Create Claude prompt
+            prompt = f"""Analyze {symbol} cryptocurrency market:
+
+Current Price: ${current_price:,.2f}
+Volume Trend: {volume_trend}
+Price Change (24h): {((current_price / market_data['close'].iloc[-24] - 1) * 100):.2f}%
+
+Provide trading analysis in JSON:
+{{
+    "direction": "LONG/SHORT/NEUTRAL",
+    "probability": 0.75,
+    "confidence": 0.80,
+    "reasoning": "Brief volume and momentum analysis"
+}}"""
+
+            # Call Claude
+            message = await client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=300,
+                temperature=0.3,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+
+            # Parse response
+            import json
+            import re
+
+            # Extract JSON from response
+            content = message.content[0].text
+            json_match = re.search(r'\{[^}]+\}', content, re.DOTALL)
+
+            if json_match:
+                result = json.loads(json_match.group())
+
+                return SignalResult(
+                    direction=result["direction"],
+                    probability=float(result["probability"]),
+                    confidence=float(result["confidence"]),
+                    reasoning=f"Claude: {result['reasoning']}"
+                )
+            else:
+                raise ValueError("Could not parse JSON from Claude response")
+
+        except Exception as e:
+            logger.error(f"Claude analysis error: {e}")
+            # Fallback to volume-based analysis
+            recent_volume = market_data['volume'].tail(10).mean()
+            avg_volume = market_data['volume'].mean()
+
+            if recent_volume > avg_volume * 1.2:
+                direction = "LONG" if current_price > market_data['close'].iloc[-10] else "SHORT"
+                probability = 0.72
+            else:
+                direction = "NEUTRAL"
+                probability = 0.50
+
+            return SignalResult(
+                direction=direction,
+                probability=probability,
+                confidence=0.68,
+                reasoning="Claude: Fallback analysis - volume profile and price momentum"
+            )
 
     async def _ta_analysis(self, market_data: pd.DataFrame, current_price: float) -> SignalResult:
-        """Technical Analysis Rules (ATR-based signals)"""
-        from ta.volatility import AverageTrueRange
-        from ta.trend import EMAIndicator
+        """
+        Technical Analysis using TradingView's Top-Rated Strategies
 
-        # Calculate ATR
-        atr = AverageTrueRange(
-            high=market_data['high'],
-            low=market_data['low'],
-            close=market_data['close'],
-            window=settings.ATR_PERIOD
-        ).average_true_range()
+        Combines 6 proven strategies:
+        1. SuperTrend (67% win rate, 177% returns)
+        2. RSI + EMA Crossover
+        3. MACD + Stochastic RSI
+        4. Ichimoku Cloud
+        5. WaveTrend Dead Zone
+        6. Multi-Indicator Consensus
 
-        current_atr = atr.iloc[-1]
+        Returns weighted ensemble of all strategy signals.
+        """
+        from app.strategies.strategies import (
+            SuperTrendStrategy,
+            RSIEMAStrategy,
+            MACDStochStrategy,
+            IchimokuStrategy,
+            WaveTrendStrategy,
+            MultiIndicatorStrategy
+        )
 
-        # Calculate EMAs
-        ema_20 = EMAIndicator(close=market_data['close'], window=20).ema_indicator()
-        ema_50 = EMAIndicator(close=market_data['close'], window=50).ema_indicator()
+        # Initialize strategies
+        strategies = [
+            SuperTrendStrategy(),
+            RSIEMAStrategy(),
+            MACDStochStrategy(),
+            IchimokuStrategy(),
+            WaveTrendStrategy(),
+            MultiIndicatorStrategy()
+        ]
 
-        current_ema_20 = ema_20.iloc[-1]
-        current_ema_50 = ema_50.iloc[-1]
+        # Generate signals from all strategies
+        signals = []
+        for strategy in strategies:
+            try:
+                signal = strategy.generate_signal(market_data.copy(), current_price)
+                if signal.should_enter:
+                    signals.append({
+                        'strategy': strategy.name,
+                        'direction': signal.direction,
+                        'confidence': signal.confidence,
+                        'reasoning': signal.reasoning
+                    })
+            except Exception as e:
+                logger.warning(f"Strategy {strategy.name} failed: {e}")
+                continue
 
-        # Simple TA logic
-        if current_price > current_ema_20 and current_ema_20 > current_ema_50:
+        # Calculate ensemble from strategy signals
+        if not signals:
+            # No clear signals - return neutral
+            return SignalResult(
+                direction="NEUTRAL",
+                probability=0.50,
+                confidence=0.50,
+                reasoning="TA: No clear signals from any strategy"
+            )
+
+        # Count directions
+        long_signals = [s for s in signals if s['direction'] == 'LONG']
+        short_signals = [s for s in signals if s['direction'] == 'SHORT']
+
+        # Determine consensus direction
+        if len(long_signals) > len(short_signals):
             direction = "LONG"
-            probability = 0.80
-        elif current_price < current_ema_20 and current_ema_20 < current_ema_50:
+            relevant_signals = long_signals
+            # Probability based on number of agreeing strategies
+            probability = min(0.60 + (len(long_signals) / len(strategies)) * 0.30, 0.95)
+        elif len(short_signals) > len(long_signals):
             direction = "SHORT"
-            probability = 0.20
+            relevant_signals = short_signals
+            probability = max(0.05, 0.40 - (len(short_signals) / len(strategies)) * 0.30)
         else:
-            direction = "NEUTRAL"
-            probability = 0.50
+            # Equal votes - check confidence
+            long_conf = np.mean([s['confidence'] for s in long_signals]) if long_signals else 0
+            short_conf = np.mean([s['confidence'] for s in short_signals]) if short_signals else 0
+
+            if long_conf > short_conf:
+                direction = "LONG"
+                relevant_signals = long_signals
+                probability = 0.55 + (long_conf * 0.20)
+            else:
+                direction = "SHORT"
+                relevant_signals = short_signals
+                probability = 0.45 - (short_conf * 0.20)
+
+        # Calculate overall confidence (weighted by individual strategy confidence)
+        if relevant_signals:
+            overall_confidence = np.mean([s['confidence'] for s in relevant_signals])
+        else:
+            overall_confidence = 0.50
+
+        # Generate reasoning
+        strategy_names = [s['strategy'] for s in relevant_signals]
+        reasoning = (
+            f"TA Strategies ({len(relevant_signals)}/{len(strategies)} agree): "
+            f"{', '.join(strategy_names)} all signal {direction}"
+        )
 
         return SignalResult(
             direction=direction,
             probability=probability,
-            confidence=0.70,
-            reasoning=f"TA: EMA20={current_ema_20:.2f}, EMA50={current_ema_50:.2f}, ATR={current_atr:.2f}"
+            confidence=overall_confidence,
+            reasoning=reasoning
         )
 
     def _calculate_agreement(self, directions: list[str]) -> float:

@@ -3,6 +3,7 @@ from binance.exceptions import BinanceAPIException
 from typing import Dict, List, Optional
 import pandas as pd
 from app.core.config import settings
+from app.services.margin_calculator import MarginCalculator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -355,4 +356,172 @@ class BinanceFuturesClient:
             return order
         except Exception as e:
             logger.error(f"Error closing position: {e}")
+            raise
+
+    async def calculate_position_margin(
+        self,
+        symbol: str,
+        position_size: float,
+        entry_price: float = None,
+        leverage: int = None
+    ) -> Dict:
+        """
+        Calculate margin requirements and risk metrics for a position
+
+        Args:
+            symbol: Trading pair
+            position_size: Position quantity
+            entry_price: Entry price (uses current price if None)
+            leverage: Leverage (uses DEFAULT_LEVERAGE if None)
+
+        Returns:
+            Complete margin analysis including liquidation price
+        """
+        try:
+            # Get current price if entry price not provided
+            if entry_price is None:
+                entry_price = await self.get_current_price(symbol)
+
+            # Use default leverage if not specified
+            leverage = leverage or settings.DEFAULT_LEVERAGE
+
+            # Get account balance
+            balance = await self.get_account_balance()
+            wallet_balance = balance['availableBalance']
+
+            # Calculate initial and maintenance margins
+            initial_margin = MarginCalculator.calculate_initial_margin(
+                position_size, entry_price, leverage
+            )
+
+            maintenance_margin, mmr = MarginCalculator.calculate_maintenance_margin(
+                position_size, entry_price
+            )
+
+            # Check if sufficient balance
+            if initial_margin > wallet_balance:
+                logger.warning(
+                    f"Insufficient balance: Required {initial_margin:.2f} USDT, "
+                    f"Available {wallet_balance:.2f} USDT"
+                )
+
+            return {
+                'symbol': symbol,
+                'position_size': position_size,
+                'entry_price': entry_price,
+                'leverage': leverage,
+                'initial_margin': initial_margin,
+                'maintenance_margin': maintenance_margin,
+                'maintenance_margin_rate': mmr,
+                'wallet_balance': wallet_balance,
+                'sufficient_balance': initial_margin <= wallet_balance
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating position margin: {e}")
+            raise
+
+    async def get_position_risk_metrics(self, symbol: str) -> Dict:
+        """
+        Get detailed risk metrics for an open position
+
+        Args:
+            symbol: Trading pair
+
+        Returns:
+            Comprehensive risk analysis including margin ratio and liquidation distance
+        """
+        try:
+            # Get position information
+            positions = await self.get_open_positions()
+            position = next((p for p in positions if p['symbol'] == symbol), None)
+
+            if not position:
+                return {'error': f'No open position found for {symbol}'}
+
+            # Get account balance
+            balance = await self.get_account_balance()
+
+            # Get complete position summary
+            summary = MarginCalculator.get_position_summary(
+                position_size=position['quantity'],
+                entry_price=position['entryPrice'],
+                mark_price=position['markPrice'],
+                side=position['side'],
+                leverage=position['leverage'],
+                wallet_balance=balance['availableBalance']
+            )
+
+            # Add position details
+            summary.update({
+                'symbol': symbol,
+                'side': position['side'],
+                'quantity': position['quantity'],
+                'entry_price': position['entryPrice'],
+                'mark_price': position['markPrice'],
+                'leverage': position['leverage']
+            })
+
+            return summary
+
+        except Exception as e:
+            logger.error(f"Error getting position risk metrics: {e}")
+            raise
+
+    async def calculate_safe_position_size(
+        self,
+        symbol: str,
+        leverage: int = None,
+        max_risk_pct: float = None
+    ) -> Dict:
+        """
+        Calculate maximum safe position size based on available balance
+
+        Args:
+            symbol: Trading pair
+            leverage: Desired leverage (uses DEFAULT_LEVERAGE if None)
+            max_risk_pct: Max % of balance to risk (uses MAX_POSITION_SIZE_PCT if None)
+
+        Returns:
+            Safe position size and related metrics
+        """
+        try:
+            # Get current price and balance
+            current_price = await self.get_current_price(symbol)
+            balance = await self.get_account_balance()
+            available_balance = balance['availableBalance']
+
+            # Use defaults if not specified
+            leverage = leverage or settings.DEFAULT_LEVERAGE
+            max_risk_pct = max_risk_pct or settings.MAX_POSITION_SIZE_PCT
+
+            # Calculate max safe position size
+            max_position_size = MarginCalculator.calculate_max_position_size(
+                available_balance, current_price, leverage, max_risk_pct
+            )
+
+            # Calculate margins for this position
+            initial_margin = MarginCalculator.calculate_initial_margin(
+                max_position_size, current_price, leverage
+            )
+
+            maintenance_margin, mmr = MarginCalculator.calculate_maintenance_margin(
+                max_position_size, current_price
+            )
+
+            return {
+                'symbol': symbol,
+                'current_price': current_price,
+                'available_balance': available_balance,
+                'max_position_size': max_position_size,
+                'max_position_value': max_position_size * current_price,
+                'leverage': leverage,
+                'max_risk_pct': max_risk_pct,
+                'initial_margin': initial_margin,
+                'maintenance_margin': maintenance_margin,
+                'maintenance_margin_rate': mmr
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating safe position size: {e}")
             raise

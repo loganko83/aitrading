@@ -42,6 +42,7 @@ python-dotenv==1.0.0
 # HTTP client
 httpx==0.26.0
 aiohttp==3.9.1
+requests==2.31.0  # For Telegram Bot API
 
 # Background tasks
 celery==5.3.6

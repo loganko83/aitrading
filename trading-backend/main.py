@@ -3,11 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Initialize logging system
+from app.core.logging_config import setup_logging
+setup_logging(log_level="DEBUG" if settings.DEBUG else "INFO")
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +16,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Register exception handlers
+from app.core.exceptions import register_exception_handlers
+register_exception_handlers(app)
 
 # CORS configuration
 app.add_middleware(
@@ -35,18 +37,26 @@ async def root():
     return {
         "status": "ok",
         "app": settings.APP_NAME,
-        "testnet": settings.BINANCE_TESTNET
-    }
-
-
-@app.get("/health")
-async def health_check():
-    """Detailed health check"""
-    return {
-        "status": "healthy",
-        "database": "connected",  # TODO: Add actual DB check
-        "binance": "connected",   # TODO: Add actual Binance check
-        "redis": "connected"      # TODO: Add actual Redis check
+        "testnet": settings.BINANCE_TESTNET,
+        "version": "1.1.0",
+        "features": {
+            "stability": {
+                "retry_logic": "enabled",
+                "circuit_breaker": "enabled",
+                "timeout_protection": "enabled",
+                "graceful_degradation": "enabled"
+            },
+            "performance": {
+                "caching": "enabled",
+                "performance_tracking": "enabled",
+                "cache_warmup": "enabled"
+            },
+            "optimization": {
+                "preset_system": "enabled",
+                "exchange_optimization": "enabled",
+                "auto_recommendation": "enabled"
+            }
+        }
     }
 
 
@@ -56,12 +66,23 @@ async def startup_event():
     """Initialize services on startup"""
     logger.info("Starting TradingBot AI Backend...")
 
+    # Initialize cache system
+    from app.core.cache import initialize_cache, cache_cleanup_task
+    import asyncio
+
+    logger.info("Initializing cache system...")
+    initialize_cache()  # Warm up preset and strategy caches
+
+    # Start background cache cleanup task
+    logger.info("Starting background cache cleanup task...")
+    asyncio.create_task(cache_cleanup_task())
+
     # TODO: Initialize market monitor for selected symbols
     # from app.workers.market_monitor import MarketMonitor
     # market_monitor = MarketMonitor(symbols=["BTCUSDT", "ETHUSDT"])
     # await market_monitor.start()
 
-    logger.info("Backend started successfully")
+    logger.info("Backend started successfully with caching enabled")
 
 
 @app.on_event("shutdown")
@@ -80,7 +101,70 @@ async def shutdown_event():
 
 
 # Import and include API routers
-from app.api.v1 import trading, websocket as ws_router, strategies
+from app.api.v1 import trading, websocket as ws_router, strategies, backtest, simple, health, performance, optimize, webhook, accounts, accounts_secure, telegram, pine_script
+
+# Health monitoring (system stability status)
+app.include_router(
+    health.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["🔍 System Health & Monitoring"]
+)
+
+# Performance monitoring (cache & optimization)
+app.include_router(
+    performance.router,
+    prefix=f"{settings.API_V1_PREFIX}/performance",
+    tags=["⚡ Performance & Cache Management"]
+)
+
+# Simple API (user-friendly, recommended for beginners)
+app.include_router(
+    simple.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["✨ Simple API (Recommended)"]
+)
+
+# Optimization API (parameter tuning)
+app.include_router(
+    optimize.router,
+    prefix=f"{settings.API_V1_PREFIX}/optimize",
+    tags=["🧬 Parameter Optimization"]
+)
+
+# TradingView Webhook API (auto-trading)
+app.include_router(
+    webhook.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["📡 TradingView Webhooks"]
+)
+
+# Account Management API (API key registration)
+app.include_router(
+    accounts.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["👤 Account Management"]
+)
+
+# Secure Account Management API (with authentication & encryption)
+app.include_router(
+    accounts_secure.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["🔐 Secure Account Management (Recommended)"]
+)
+
+# Telegram Notification API
+app.include_router(
+    telegram.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["📱 Telegram Notifications"]
+)
+
+# Pine Script Strategy Management API
+app.include_router(
+    pine_script.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["🤖 AI Pine Script Generator"]
+)
 
 app.include_router(
     trading.router,
@@ -92,6 +176,12 @@ app.include_router(
     strategies.router,
     prefix=f"{settings.API_V1_PREFIX}",
     tags=["Strategies"]
+)
+
+app.include_router(
+    backtest.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["Backtesting (Advanced)"]
 )
 
 app.include_router(
