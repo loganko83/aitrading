@@ -9,7 +9,7 @@ interface Props {
 
 export default function SessionProvider({ children }: Props) {
   return (
-    <NextAuthSessionProvider>
+    <NextAuthSessionProvider basePath="/trading/api/auth">
       {children}
     </NextAuthSessionProvider>
   );
