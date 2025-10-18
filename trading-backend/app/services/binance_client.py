@@ -362,3 +362,58 @@ class BinanceClient:
         """현재 시장가 조회"""
         result = self._request("GET", f"/fapi/v1/ticker/price", params={"symbol": symbol})
         return float(result["price"])
+
+    def validate_credentials(self) -> Dict[str, Any]:
+        """
+        API 키 유효성 검증
+
+        Returns:
+            Dict with validation result:
+            - valid: bool
+            - message: str
+            - details: Optional[Dict] (account info if valid)
+
+        Raises:
+            Exception: API 호출 실패 시
+        """
+        try:
+            # 계정 잔액 조회를 통해 API 키 유효성 검증
+            account_info = self.get_account_balance()
+
+            return {
+                "valid": True,
+                "message": "API credentials are valid",
+                "details": {
+                    "available_balance": account_info["available_balance"],
+                    "total_balance": account_info["total_balance"],
+                    "testnet": self.testnet
+                }
+            }
+
+        except requests.exceptions.HTTPError as e:
+            # HTTP 에러 처리
+            if e.response.status_code == 401:
+                return {
+                    "valid": False,
+                    "message": "Invalid API key or signature",
+                    "error_code": 401
+                }
+            elif e.response.status_code == 403:
+                return {
+                    "valid": False,
+                    "message": "API key does not have required permissions",
+                    "error_code": 403
+                }
+            else:
+                return {
+                    "valid": False,
+                    "message": f"API validation failed: {str(e)}",
+                    "error_code": e.response.status_code
+                }
+
+        except Exception as e:
+            logger.error(f"Credential validation error: {str(e)}")
+            return {
+                "valid": False,
+                "message": f"Validation error: {str(e)}"
+            }

@@ -21,8 +21,8 @@ test.describe('Production Site Test', () => {
 
     // Navigate to production site
     console.log('Navigating to https://trendy.storydot.kr/trading...');
-    const response = await page.goto('https://trendy.storydot.kr/trading', {
-      waitUntil: 'networkidle',
+    const response = await page.goto('https://trendy.storydot.kr/trading/', {
+      waitUntil: 'load',
       timeout: 30000
     });
 
@@ -68,8 +68,8 @@ test.describe('Production Site Test', () => {
     });
 
     console.log('Navigating to signup page...');
-    const response = await page.goto('https://trendy.storydot.kr/trading/signup', {
-      waitUntil: 'networkidle',
+    const response = await page.goto('https://trendy.storydot.kr/trading/signup/', {
+      waitUntil: 'load',
       timeout: 30000
     });
 
