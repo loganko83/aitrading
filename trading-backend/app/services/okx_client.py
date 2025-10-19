@@ -17,7 +17,7 @@ import requests
 from datetime import datetime
 import logging
 
-from app.core.stability import with_retry, with_timeout, RetryStrategy
+from app.core.stability import with_retry, RetryStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,6 @@ class OKXClient:
         }
 
     @with_retry(max_attempts=3, strategy=RetryStrategy.EXPONENTIAL)
-    @with_timeout(10.0)
     def _request(
         self,
         method: str,
