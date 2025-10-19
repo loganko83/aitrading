@@ -9,13 +9,15 @@ import logging
 from datetime import datetime, time
 from typing import Dict, List, Optional, Set
 
+from sqlalchemy import select
+
 from app.core.config import settings
 from app.services.telegram_service import TelegramService
 from app.services.binance_client import BinanceClient
 from app.services.okx_client import OKXClient
 from app.models.api_key import ApiKey
-from app.database.session import get_db
-from sqlalchemy.orm import Session
+from app.database.base import AsyncSessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -94,24 +96,25 @@ class RiskMonitor:
 
     async def monitor_all_accounts(self):
         """모든 활성 계정 모니터링"""
-        db: Session = next(get_db())
+        async with AsyncSessionLocal() as db:
+            try:
+                # 모든 활성 API 키 조회
+                stmt = select(ApiKey).where(ApiKey.is_active == True)
+                result = await db.execute(stmt)
+                active_keys = result.scalars().all()
 
-        try:
-            # 모든 활성 API 키 조회
-            active_keys = db.query(ApiKey).filter(
-                ApiKey.is_active == True
-            ).all()
+                for api_key in active_keys:
+                    try:
+                        await self.monitor_account(api_key, db)
+                    except Exception as e:
+                        logger.error(f"Error monitoring account {api_key.id}: {e}")
 
-            for api_key in active_keys:
-                try:
-                    await self.monitor_account(api_key, db)
-                except Exception as e:
-                    logger.error(f"Error monitoring account {api_key.id}: {e}")
+            except Exception as e:
+                logger.error(f"Error in monitor_all_accounts: {e}")
+                await db.rollback()
+                raise
 
-        finally:
-            db.close()
-
-    async def monitor_account(self, api_key: ApiKey, db: Session):
+    async def monitor_account(self, api_key: ApiKey, db: AsyncSession):
         """개별 계정 모니터링"""
 
         # 거래소 클라이언트 생성
@@ -407,23 +410,24 @@ class RiskMonitor:
     async def send_daily_reports(self):
         """모든 계정에 일일 리포트 전송"""
 
-        db: Session = next(get_db())
+        async with AsyncSessionLocal() as db:
+            try:
+                stmt = select(ApiKey).where(ApiKey.is_active == True)
+                result = await db.execute(stmt)
+                active_keys = result.scalars().all()
 
-        try:
-            active_keys = db.query(ApiKey).filter(
-                ApiKey.is_active == True
-            ).all()
+                for api_key in active_keys:
+                    try:
+                        await self.send_account_daily_report(api_key, db)
+                    except Exception as e:
+                        logger.error(f"Error sending daily report for {api_key.id}: {e}")
 
-            for api_key in active_keys:
-                try:
-                    await self.send_account_daily_report(api_key, db)
-                except Exception as e:
-                    logger.error(f"Error sending daily report for {api_key.id}: {e}")
+            except Exception as e:
+                logger.error(f"Error in send_daily_reports: {e}")
+                await db.rollback()
+                raise
 
-        finally:
-            db.close()
-
-    async def send_account_daily_report(self, api_key: ApiKey, db: Session):
+    async def send_account_daily_report(self, api_key: ApiKey, db: AsyncSession):
         """개별 계정 일일 리포트"""
 
         # 거래소 클라이언트 생성

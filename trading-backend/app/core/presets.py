@@ -286,6 +286,9 @@ PRESETS: Dict[str, TradingPreset] = {
     "professional": PRESET_PROFESSIONAL
 }
 
+# List of all presets (for cache initialization)
+ALL_PRESETS = list(PRESETS.values())
+
 
 def get_preset(preset_id: str) -> Optional[TradingPreset]:
     """Get preset by ID"""
