@@ -24,6 +24,9 @@ class User(Base):
     totp_secret = Column(String, nullable=True)  # Encrypted TOTP secret for 2FA
     is_active = Column(Boolean, default=True, nullable=False)
 
+    # Notification settings
+    telegram_chat_id = Column(String, nullable=True)  # Telegram chat ID for risk alerts
+
     # Gamification fields
     total_xp = Column(Integer, default=0)
     level = Column(Integer, default=1)

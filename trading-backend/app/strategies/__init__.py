@@ -7,6 +7,7 @@ Implements TradingView Pine Script top-rated indicators in Python:
 - MACD + Stochastic RSI (Multi-confirmation)
 - Ichimoku Cloud (Comprehensive trend system)
 - WaveTrend Oscillator (Dead Zone strategy)
+- LSTM AI (Deep learning + Technical + LLM ensemble)
 """
 
 from .indicators import (
@@ -29,6 +30,13 @@ from .strategies import (
     MultiIndicatorStrategy
 )
 
+from .lstm_strategy import (
+    LSTMStrategy,
+    LSTMFastStrategy,
+    LSTMConservativeStrategy,
+    LSTMAggressiveStrategy
+)
+
 __all__ = [
     'calculate_supertrend',
     'calculate_rsi',
@@ -43,5 +51,9 @@ __all__ = [
     'MACDStochStrategy',
     'IchimokuStrategy',
     'WaveTrendStrategy',
-    'MultiIndicatorStrategy'
+    'MultiIndicatorStrategy',
+    'LSTMStrategy',
+    'LSTMFastStrategy',
+    'LSTMConservativeStrategy',
+    'LSTMAggressiveStrategy'
 ]

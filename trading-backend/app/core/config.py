@@ -57,7 +57,10 @@ class Settings(BaseSettings):
     ALLOWED_HOSTS: Optional[List[str]] = None
     ENABLE_HTTPS_REDIRECT: bool = False
     ENABLE_CORS: bool = True
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
+
+    # CORS Origins (Docker-compatible: comma-separated string from env)
+    # Example: CORS_ORIGINS="http://localhost:3000,http://localhost:3001,https://your-domain.com"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
 
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = False

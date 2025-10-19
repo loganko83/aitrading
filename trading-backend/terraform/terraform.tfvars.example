@@ -1,0 +1,167 @@
+# TradingBot AI - Terraform Variables Values
+# AWS Region: ap-southeast-2 (Sydney)
+#
+# INSTRUCTIONS:
+# 1. Copy this file to terraform.tfvars
+# 2. Fill in your actual values
+# 3. NEVER commit terraform.tfvars to version control!
+
+# ============================================
+# General Configuration
+# ============================================
+aws_region   = "ap-southeast-2"  # Sydney
+project_name = "tradingbot-ai"
+environment  = "production"
+
+tags = {
+  Project     = "TradingBot-AI"
+  Environment = "production"
+  ManagedBy   = "Terraform"
+  Owner       = "YourName"
+  CostCenter  = "Engineering"
+}
+
+# ============================================
+# Network Configuration
+# ============================================
+vpc_cidr = "10.0.0.0/16"
+
+# ============================================
+# RDS PostgreSQL Configuration
+# ============================================
+db_instance_class        = "db.t3.micro"       # $0.018/hr in ap-southeast-2
+db_name                  = "tradingbot"
+db_username              = "tradingbot_admin"
+db_password              = "CHANGE_THIS_STRONG_PASSWORD_16_CHARS_MIN"  # MUST CHANGE!
+db_allocated_storage     = 20                  # GB
+db_multi_az              = true                # High availability (recommended)
+db_backup_retention_days = 7                   # Days
+
+# ============================================
+# ElastiCache Redis Configuration
+# ============================================
+redis_node_type     = "cache.t3.micro"  # $0.022/hr in ap-southeast-2
+redis_num_nodes     = 1                 # Single node (change to 2+ for HA)
+redis_engine_version = "7.0"
+
+# ============================================
+# ECS Fargate Configuration
+# ============================================
+container_port    = 8001
+ecs_task_cpu      = 512   # 0.5 vCPU ($0.0503/hr in ap-southeast-2)
+ecs_task_memory   = 1024  # 1 GB
+ecs_desired_count = 2     # Number of tasks (2 for HA)
+
+# ============================================
+# Load Balancer Configuration
+# ============================================
+# ACM certificate ARN for HTTPS (optional)
+# Get from AWS Certificate Manager: https://ap-southeast-2.console.aws.amazon.com/acm/home?region=ap-southeast-2
+# Leave empty to use HTTP only
+acm_certificate_arn = ""  # Example: "arn:aws:acm:ap-southeast-2:123456789012:certificate/..."
+
+# ============================================
+# Application Secrets
+# ============================================
+# IMPORTANT: Generate these with the commands below
+
+# Generate with: openssl rand -hex 32
+secret_key = "CHANGE_THIS_SECRET_KEY_OPENSSL_RAND_HEX_32"
+
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+webhook_secret = "CHANGE_THIS_WEBHOOK_SECRET_TOKEN_URLSAFE_32"
+
+# Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+encryption_key = "CHANGE_THIS_ENCRYPTION_KEY_FERNET_GENERATE_KEY"
+
+# ============================================
+# Exchange API Keys
+# ============================================
+# Binance API credentials
+binance_api_key    = "your_binance_api_key_here"
+binance_api_secret = "your_binance_api_secret_here"
+binance_testnet    = false  # Set to false for production mainnet
+
+# ============================================
+# AI API Keys
+# ============================================
+# OpenAI GPT-4 API key
+openai_api_key = "sk-..."
+
+# Anthropic Claude API key
+anthropic_api_key = "sk-ant-..."
+
+# ============================================
+# Telegram Configuration
+# ============================================
+# Telegram bot token from @BotFather
+telegram_bot_token = "123456789:ABC-DEF..."
+
+# ============================================
+# Auto Scaling Configuration
+# ============================================
+enable_autoscaling        = true
+autoscaling_min_capacity  = 2   # Minimum tasks
+autoscaling_max_capacity  = 10  # Maximum tasks
+autoscaling_target_cpu    = 70  # Target CPU % for scaling
+autoscaling_target_memory = 80  # Target memory % for scaling
+
+# ============================================
+# Cost Estimation (ap-southeast-2, Monthly)
+# ============================================
+# Based on above configuration:
+#
+# NAT Gateway (2 for High Availability):
+#   - 2 × $0.059/hr × 730hr = $86.14/month
+#   - Data processing: ~$10/month (estimated)
+#   - Subtotal: $96.14/month
+#
+# ECS Fargate (avg 4 tasks, 0.5 vCPU, 1GB):
+#   - 4 tasks × $0.0503/hr × 730hr = $146.88/month
+#   - With auto-scaling avg: $73.44/month
+#
+# RDS db.t3.micro (Multi-AZ):
+#   - $0.018/hr × 2 instances × 730hr = $26.28/month
+#   - Storage: 20GB × $0.138/GB = $2.76/month
+#   - Backups: ~$1.50/month
+#   - Subtotal: $30.54/month
+#
+# ElastiCache cache.t3.micro (1 node):
+#   - $0.022/hr × 730hr = $16.06/month
+#
+# Application Load Balancer:
+#   - $0.0243/hr × 730hr = $17.74/month
+#   - LCU: ~$5.26/month (estimated)
+#   - Subtotal: $23.00/month
+#
+# ECR (Docker Registry):
+#   - 5GB storage × $0.10/GB = $0.50/month
+#
+# CloudWatch:
+#   - Logs: 10GB × $0.50/GB = $5.00/month
+#   - Alarms: 8 alarms × $0.10 = $0.80/month
+#   - Dashboard: $3.00/month
+#   - Subtotal: $8.80/month
+#
+# Secrets Manager:
+#   - 8 secrets × $0.40 = $3.20/month
+#
+# Data Transfer:
+#   - Outbound: 100GB × $0.02/GB = $2.00/month
+#
+# TOTAL ESTIMATED: ~$251.66/month
+#
+# Cost Optimization Strategies (Save up to 50%):
+# 1. Replace NAT Gateway with VPC Endpoints: -$60/month
+#    - S3, ECR, CloudWatch, Secrets Manager endpoints
+# 2. Use Fargate Spot (70% discount): -$50/month
+# 3. RDS Reserved Instances (1yr): -$10/month
+# 4. Reduce CloudWatch log retention (7 days): -$3/month
+#
+# OPTIMIZED COST: ~$129/month
+#
+# Notes:
+# - NAT Gateway is the most expensive component
+# - Auto-scaling will vary ECS costs
+# - Consider Spot instances for non-critical workloads
+# - Reserved Instances provide significant savings

@@ -51,3 +51,48 @@ coverage/
 .temp/
 tmp/
 nul
+
+# Terraform (CRITICAL - Contains secrets and state)
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Secrets and API Keys (CRITICAL)
+*secret*
+*password*
+*credentials*
+*api_key*
+*api_secret*
+!SECURITY.md
+!trading-backend/app/core/crypto.py
+!trading-backend/app/core/security.py
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# AWS
+.aws/
+
+# Docker
+.dockerignore
+
+# Alembic
+alembic/versions/*.pyc
+
+# Backups
+*.bak
+*.backup
+
+# Archives
+*.tar.gz
+*.zip

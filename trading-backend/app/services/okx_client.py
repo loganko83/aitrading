@@ -62,7 +62,7 @@ class OKXClient:
         }
 
     @with_retry(max_attempts=3, strategy=RetryStrategy.EXPONENTIAL)
-    @with_timeout(timeout_seconds=10.0)
+    @with_timeout(10.0)
     def _request(
         self,
         method: str,
@@ -310,6 +310,29 @@ class OKXClient:
             raise Exception(f"Failed to get price for {symbol}")
 
         return float(result[0]["last"])
+
+    def get_24h_ticker(self, symbol: str) -> Dict[str, Any]:
+        """24시간 통계 조회"""
+        result = self._request("GET", "/api/v5/market/ticker", params={"instId": symbol})
+
+        if not result:
+            raise Exception(f"Failed to get 24h ticker for {symbol}")
+
+        ticker = result[0]
+
+        return {
+            "symbol": ticker["instId"],
+            "price_change": float(ticker["last"]) - float(ticker["open24h"]),
+            "price_change_percent": ((float(ticker["last"]) - float(ticker["open24h"])) / float(ticker["open24h"]) * 100) if float(ticker["open24h"]) > 0 else 0,
+            "last_price": float(ticker["last"]),
+            "high_price": float(ticker["high24h"]),
+            "low_price": float(ticker["low24h"]),
+            "volume": float(ticker["vol24h"]),
+            "quote_volume": float(ticker["volCcy24h"]),
+            "open_time": int(ticker["ts"]) - (24 * 60 * 60 * 1000),  # 24시간 전
+            "close_time": int(ticker["ts"]),
+            "count": 0  # OKX는 거래 횟수 제공 안함
+        }
 
     def validate_credentials(self) -> Dict[str, Any]:
         """

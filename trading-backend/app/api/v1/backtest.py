@@ -21,6 +21,12 @@ from app.strategies.strategies import (
     MultiIndicatorStrategy,
     BaseStrategy
 )
+from app.strategies.lstm_strategy import (
+    LSTMStrategy,
+    LSTMFastStrategy,
+    LSTMConservativeStrategy,
+    LSTMAggressiveStrategy
+)
 from app.backtesting.engine import BacktestEngine, BacktestResult
 from app.backtesting.metrics import PerformanceMetrics
 from app.ai.pine_converter import get_pine_converter, ConversionResult
@@ -40,6 +46,10 @@ class StrategyType(str, Enum):
     ICHIMOKU = "ichimoku"
     WAVETREND = "wavetrend"
     MULTI_INDICATOR = "multi_indicator"
+    LSTM = "lstm"
+    LSTM_FAST = "lstm_fast"
+    LSTM_CONSERVATIVE = "lstm_conservative"
+    LSTM_AGGRESSIVE = "lstm_aggressive"
 
 
 class TimeframeType(str, Enum):
@@ -212,6 +222,10 @@ def get_strategy_instance(strategy_type: StrategyType, params: Optional[Dict] = 
         StrategyType.ICHIMOKU: IchimokuStrategy,
         StrategyType.WAVETREND: WaveTrendStrategy,
         StrategyType.MULTI_INDICATOR: MultiIndicatorStrategy,
+        StrategyType.LSTM: LSTMStrategy,
+        StrategyType.LSTM_FAST: LSTMFastStrategy,
+        StrategyType.LSTM_CONSERVATIVE: LSTMConservativeStrategy,
+        StrategyType.LSTM_AGGRESSIVE: LSTMAggressiveStrategy,
     }
 
     strategy_class = strategy_map.get(strategy_type)
@@ -416,6 +430,42 @@ async def list_available_strategies():
             performance_notes="Highest accuracy through consensus voting",
             recommended_symbols=["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"],
             recommended_timeframes=["15m", "1h", "4h"]
+        ),
+        StrategyInfo(
+            id="lstm",
+            name="LSTM AI Strategy (Full)",
+            description="Deep learning price prediction + technical analysis + LLM insights",
+            category="AI / Machine Learning",
+            performance_notes="Advanced AI ensemble: 40% LSTM + 40% Technical + 20% LLM. Requires trained model.",
+            recommended_symbols=["BTCUSDT", "ETHUSDT"],
+            recommended_timeframes=["1h", "4h"]
+        ),
+        StrategyInfo(
+            id="lstm_fast",
+            name="LSTM AI Strategy (Fast)",
+            description="LSTM + Technical analysis only (no LLM for speed)",
+            category="AI / Machine Learning",
+            performance_notes="3x faster than full LSTM. Good for high-frequency backtesting. 60% min confidence.",
+            recommended_symbols=["BTCUSDT", "ETHUSDT"],
+            recommended_timeframes=["1h", "4h"]
+        ),
+        StrategyInfo(
+            id="lstm_conservative",
+            name="LSTM AI Strategy (Conservative)",
+            description="High-confidence trading with strict entry criteria",
+            category="AI / Machine Learning",
+            performance_notes="75% min confidence, 1% risk per trade, wider stop-loss. Best for risk-averse traders.",
+            recommended_symbols=["BTCUSDT", "ETHUSDT"],
+            recommended_timeframes=["4h", "1d"]
+        ),
+        StrategyInfo(
+            id="lstm_aggressive",
+            name="LSTM AI Strategy (Aggressive)",
+            description="High-frequency trading with lower entry threshold",
+            category="AI / Machine Learning",
+            performance_notes="50% min confidence, 5% risk per trade, tighter stop-loss. ⚠️ Higher risk.",
+            recommended_symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+            recommended_timeframes=["15m", "1h"]
         )
     ]
 
@@ -868,4 +918,472 @@ async def analyze_pine_script(request: PineScriptImportRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Pine Script 분석 중 오류가 발생했습니다: {str(e)}"
+        )
+
+
+# ===== Multi-Symbol Backtesting =====
+
+class MultiSymbolBacktestRequest(BaseModel):
+    """Multi-symbol backtest request"""
+    strategy_type: StrategyType
+    symbols: List[str] = Field(default=["BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT"], description="List of trading symbols")
+    initial_capital: float = Field(default=10000.0, ge=100, description="Initial capital in USDT")
+    leverage: int = Field(default=3, ge=1, le=20, description="Trading leverage")
+    position_size_pct: float = Field(default=0.10, ge=0.01, le=1.0, description="Position size as % of capital per symbol")
+
+    # Date range
+    days_back: int = Field(default=30, ge=1, le=365, description="Days to backtest")
+
+    # Fee structure
+    maker_fee: float = Field(default=0.0002, description="Maker fee")
+    taker_fee: float = Field(default=0.0004, description="Taker fee")
+
+    # Strategy-specific parameters
+    custom_params: Optional[Dict[str, Any]] = None
+
+
+class SymbolBacktestResult(BaseModel):
+    """Single symbol result in multi-symbol backtest"""
+    symbol: str
+    total_trades: int
+    win_rate: float
+    total_return_pct: float
+    sharpe_ratio: float
+    max_drawdown_pct: float
+    profit_factor: float
+    performance_rating: str
+
+
+class MultiSymbolBacktestResponse(BaseModel):
+    """Multi-symbol backtest response"""
+    strategy_name: str
+    symbols: List[str]
+    start_date: str
+    end_date: str
+    initial_capital: float
+
+    # Per-symbol results
+    symbol_results: List[SymbolBacktestResult]
+
+    # Portfolio-level metrics
+    portfolio_total_return_pct: float
+    portfolio_sharpe_ratio: float
+    portfolio_max_drawdown_pct: float
+    portfolio_win_rate: float
+    total_trades_all_symbols: int
+
+    # Rankings
+    best_performing_symbol: str
+    worst_performing_symbol: str
+
+
+@router.post("/multi-symbol", response_model=MultiSymbolBacktestResponse)
+async def run_multi_symbol_backtest(request: MultiSymbolBacktestRequest):
+    """
+    Run backtest on multiple symbols simultaneously
+
+    Executes the same strategy across multiple trading pairs and aggregates results.
+    Useful for:
+    - Comparing strategy performance across different assets
+    - Diversification analysis
+    - Finding best-performing symbols for a strategy
+
+    Returns both individual symbol results and aggregated portfolio metrics.
+    """
+    try:
+        # Get strategy instance
+        strategy = get_strategy_instance(request.strategy_type, request.custom_params)
+
+        symbol_results = []
+        all_trades = 0
+        all_winning_trades = 0
+        all_losing_trades = 0
+        portfolio_returns = []
+        portfolio_sharpe_ratios = []
+        portfolio_mdd_pcts = []
+
+        # Run backtest for each symbol
+        for symbol in request.symbols:
+            # Generate historical data
+            df = generate_mock_ohlcv_data(
+                symbol=symbol,
+                days_back=request.days_back
+            )
+
+            logger.info(f"Running backtest: {strategy.name} on {symbol}, {len(df)} candles")
+
+            # Initialize backtest engine
+            engine = BacktestEngine(
+                initial_capital=request.initial_capital / len(request.symbols),  # Divide capital among symbols
+                maker_fee=request.maker_fee,
+                taker_fee=request.taker_fee,
+                leverage=request.leverage,
+                position_size_pct=request.position_size_pct
+            )
+
+            # Run backtest
+            result = engine.run(
+                strategy=strategy,
+                df=df,
+                symbol=symbol
+            )
+
+            # Get performance rating
+            metrics = PerformanceMetrics.from_backtest_result(result)
+
+            # Store symbol result
+            symbol_results.append(SymbolBacktestResult(
+                symbol=symbol,
+                total_trades=result.total_trades,
+                win_rate=result.win_rate,
+                total_return_pct=result.total_return_pct,
+                sharpe_ratio=result.sharpe_ratio,
+                max_drawdown_pct=result.max_drawdown_pct,
+                profit_factor=result.profit_factor,
+                performance_rating=metrics.get_rating()
+            ))
+
+            # Aggregate portfolio metrics
+            all_trades += result.total_trades
+            all_winning_trades += result.winning_trades
+            all_losing_trades += result.losing_trades
+            portfolio_returns.append(result.total_return_pct)
+            portfolio_sharpe_ratios.append(result.sharpe_ratio)
+            portfolio_mdd_pcts.append(result.max_drawdown_pct)
+
+        # Calculate portfolio-level metrics
+        portfolio_total_return_pct = sum(portfolio_returns) / len(portfolio_returns)  # Equal-weighted average
+        portfolio_sharpe_ratio = sum(portfolio_sharpe_ratios) / len(portfolio_sharpe_ratios)
+        portfolio_max_drawdown_pct = max(portfolio_mdd_pcts)  # Worst drawdown
+        portfolio_win_rate = (all_winning_trades / all_trades * 100) if all_trades > 0 else 0
+
+        # Find best and worst performing symbols
+        best_symbol = max(symbol_results, key=lambda x: x.total_return_pct)
+        worst_symbol = min(symbol_results, key=lambda x: x.total_return_pct)
+
+        response = MultiSymbolBacktestResponse(
+            strategy_name=strategy.name,
+            symbols=request.symbols,
+            start_date=(datetime.now() - timedelta(days=request.days_back)).isoformat(),
+            end_date=datetime.now().isoformat(),
+            initial_capital=request.initial_capital,
+            symbol_results=symbol_results,
+            portfolio_total_return_pct=portfolio_total_return_pct,
+            portfolio_sharpe_ratio=portfolio_sharpe_ratio,
+            portfolio_max_drawdown_pct=portfolio_max_drawdown_pct,
+            portfolio_win_rate=portfolio_win_rate,
+            total_trades_all_symbols=all_trades,
+            best_performing_symbol=best_symbol.symbol,
+            worst_performing_symbol=worst_symbol.symbol
+        )
+
+        logger.info(
+            f"Multi-symbol backtest complete: {all_trades} trades across {len(request.symbols)} symbols, "
+            f"Portfolio return: {portfolio_total_return_pct:+.2f}%"
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Multi-symbol backtest error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Multi-symbol backtest failed: {str(e)}"
+        )
+
+
+# ===== Portfolio Backtesting with Rebalancing =====
+
+class PortfolioBacktestRequest(BaseModel):
+    """Portfolio backtest request with rebalancing strategy"""
+    symbols: List[str] = Field(default=["BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT"])
+    target_allocation: Dict[str, float] = Field(description="Target allocation for each symbol (must sum to 100)")
+    initial_capital: float = Field(default=10000.0, ge=100)
+    days_back: int = Field(default=30, ge=1, le=365)
+
+    # Rebalancing settings
+    rebalancing_frequency_days: int = Field(default=7, ge=1, le=30, description="Rebalance every N days")
+    rebalancing_threshold_pct: float = Field(default=5.0, ge=0.5, le=20.0, description="Rebalance if drift exceeds %")
+
+    # Fee structure
+    maker_fee: float = Field(default=0.0002)
+    taker_fee: float = Field(default=0.0004)
+
+
+class RebalancingEvent(BaseModel):
+    """Single rebalancing event"""
+    timestamp: str
+    reason: str  # "scheduled" or "threshold_exceeded"
+    trades_executed: int
+    total_fees: float
+    allocation_before: Dict[str, float]
+    allocation_after: Dict[str, float]
+
+
+class PortfolioBacktestResponse(BaseModel):
+    """Portfolio backtest response"""
+    symbols: List[str]
+    target_allocation: Dict[str, float]
+    start_date: str
+    end_date: str
+    initial_capital: float
+
+    # Performance metrics
+    total_return: float
+    total_return_pct: float
+    annualized_return: float
+    sharpe_ratio: float
+    max_drawdown_pct: float
+
+    # Portfolio-specific metrics
+    correlation_avg: float  # Average correlation between assets
+    diversification_benefit: float  # Reduction in volatility vs single-asset
+
+    # Rebalancing statistics
+    total_rebalancing_events: int
+    total_rebalancing_fees: float
+    rebalancing_events: List[RebalancingEvent]
+
+    # Equity curve
+    equity_curve: List[Dict[str, Any]]
+
+
+@router.post("/portfolio", response_model=PortfolioBacktestResponse)
+async def run_portfolio_backtest(request: PortfolioBacktestRequest):
+    """
+    Run portfolio backtest with rebalancing strategy
+
+    Simulates a portfolio with:
+    - Target allocation across multiple assets
+    - Periodic rebalancing to maintain target weights
+    - Correlation-based diversification analysis
+    - Transaction costs from rebalancing
+
+    This is different from multi-symbol backtesting:
+    - Portfolio treats all symbols as one unified investment
+    - Rebalancing maintains target allocation percentages
+    - Returns are calculated at portfolio level
+    - Considers correlation benefits
+    """
+    try:
+        # Validate target allocation
+        total_allocation = sum(request.target_allocation.values())
+        if abs(total_allocation - 100) > 0.1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Target allocation must sum to 100%. Currently: {total_allocation:.2f}%"
+            )
+
+        # Ensure all symbols have allocation
+        for symbol in request.symbols:
+            if symbol not in request.target_allocation:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Symbol {symbol} missing in target_allocation"
+                )
+
+        # Generate historical data for all symbols
+        symbol_data = {}
+        for symbol in request.symbols:
+            df = generate_mock_ohlcv_data(
+                symbol=symbol,
+                days_back=request.days_back
+            )
+            symbol_data[symbol] = df
+
+        # Initialize portfolio
+        portfolio_value = request.initial_capital
+        positions = {symbol: 0.0 for symbol in request.symbols}  # Quantity held
+        equity_curve_data = []
+        rebalancing_events = []
+        total_rebalancing_fees = 0.0
+
+        # Get timestamps (assuming all symbols have same timestamps)
+        timestamps = symbol_data[request.symbols[0]]['timestamp'].tolist()
+
+        # Initial allocation
+        current_prices = {symbol: symbol_data[symbol]['close'].iloc[0] for symbol in request.symbols}
+        for symbol in request.symbols:
+            allocation_pct = request.target_allocation[symbol]
+            target_value = portfolio_value * (allocation_pct / 100)
+            positions[symbol] = target_value / current_prices[symbol]
+
+        last_rebalance_day = 0
+
+        # Simulate portfolio over time
+        for day_idx, timestamp in enumerate(timestamps):
+            # Get current prices
+            current_prices = {
+                symbol: symbol_data[symbol]['close'].iloc[day_idx]
+                for symbol in request.symbols
+            }
+
+            # Calculate current portfolio value and allocation
+            position_values = {
+                symbol: positions[symbol] * current_prices[symbol]
+                for symbol in request.symbols
+            }
+            portfolio_value = sum(position_values.values())
+
+            current_allocation = {
+                symbol: (value / portfolio_value * 100) if portfolio_value > 0 else 0
+                for symbol, value in position_values.items()
+            }
+
+            # Check if rebalancing is needed
+            should_rebalance = False
+            rebalance_reason = ""
+
+            # Scheduled rebalancing
+            if day_idx - last_rebalance_day >= request.rebalancing_frequency_days:
+                should_rebalance = True
+                rebalance_reason = "scheduled"
+
+            # Threshold-based rebalancing
+            else:
+                for symbol in request.symbols:
+                    drift = abs(current_allocation[symbol] - request.target_allocation[symbol])
+                    if drift > request.rebalancing_threshold_pct:
+                        should_rebalance = True
+                        rebalance_reason = f"threshold_exceeded ({symbol}: {drift:.2f}% drift)"
+                        break
+
+            # Execute rebalancing
+            if should_rebalance and day_idx > 0:
+                allocation_before = current_allocation.copy()
+                trades_executed = 0
+                fees = 0.0
+
+                # Rebalance to target allocation
+                for symbol in request.symbols:
+                    target_pct = request.target_allocation[symbol]
+                    target_value = portfolio_value * (target_pct / 100)
+                    current_value = position_values[symbol]
+
+                    if abs(target_value - current_value) > 10:  # Min $10 trade
+                        # Calculate new position size
+                        new_quantity = target_value / current_prices[symbol]
+                        trade_value = abs((new_quantity - positions[symbol]) * current_prices[symbol])
+
+                        # Apply fees
+                        fee = trade_value * request.taker_fee
+                        fees += fee
+                        trades_executed += 1
+
+                        # Update position
+                        positions[symbol] = new_quantity
+
+                total_rebalancing_fees += fees
+                portfolio_value -= fees  # Deduct fees
+
+                # Recalculate allocation after rebalancing
+                position_values = {
+                    symbol: positions[symbol] * current_prices[symbol]
+                    for symbol in request.symbols
+                }
+                allocation_after = {
+                    symbol: (value / portfolio_value * 100) if portfolio_value > 0 else 0
+                    for symbol, value in position_values.items()
+                }
+
+                rebalancing_events.append(RebalancingEvent(
+                    timestamp=str(timestamp),
+                    reason=rebalance_reason,
+                    trades_executed=trades_executed,
+                    total_fees=fees,
+                    allocation_before=allocation_before,
+                    allocation_after=allocation_after
+                ))
+
+                last_rebalance_day = day_idx
+
+            # Record equity curve
+            equity_curve_data.append({
+                'timestamp': str(timestamp),
+                'portfolio_value': float(portfolio_value)
+            })
+
+        # Calculate performance metrics
+        total_return = portfolio_value - request.initial_capital
+        total_return_pct = (total_return / request.initial_capital) * 100
+
+        # Calculate annualized return
+        days = len(timestamps)
+        years = days / 365
+        annualized_return = ((portfolio_value / request.initial_capital) ** (1 / years) - 1) * 100 if years > 0 else 0
+
+        # Calculate max drawdown
+        peak = request.initial_capital
+        max_dd = 0
+        for point in equity_curve_data:
+            value = point['portfolio_value']
+            if value > peak:
+                peak = value
+            dd = (peak - value) / peak * 100
+            if dd > max_dd:
+                max_dd = dd
+
+        # Calculate Sharpe ratio (simplified)
+        returns = []
+        for i in range(1, len(equity_curve_data)):
+            ret = (equity_curve_data[i]['portfolio_value'] - equity_curve_data[i-1]['portfolio_value']) / equity_curve_data[i-1]['portfolio_value']
+            returns.append(ret)
+
+        if returns:
+            import numpy as np
+            mean_return = np.mean(returns)
+            std_return = np.std(returns)
+            sharpe = (mean_return / std_return * np.sqrt(252)) if std_return > 0 else 0
+        else:
+            sharpe = 0
+
+        # Calculate correlation (simplified - using price correlation)
+        correlation_values = []
+        symbols_list = list(request.symbols)
+        for i in range(len(symbols_list)):
+            for j in range(i + 1, len(symbols_list)):
+                sym1_prices = symbol_data[symbols_list[i]]['close'].values
+                sym2_prices = symbol_data[symbols_list[j]]['close'].values
+                correlation = np.corrcoef(sym1_prices, sym2_prices)[0, 1]
+                correlation_values.append(correlation)
+
+        avg_correlation = np.mean(correlation_values) if correlation_values else 0
+
+        # Diversification benefit (placeholder - simplified calculation)
+        diversification_benefit = (1 - avg_correlation) * 10  # Simplified metric
+
+        response = PortfolioBacktestResponse(
+            symbols=request.symbols,
+            target_allocation=request.target_allocation,
+            start_date=str(timestamps[0]),
+            end_date=str(timestamps[-1]),
+            initial_capital=request.initial_capital,
+            total_return=total_return,
+            total_return_pct=total_return_pct,
+            annualized_return=annualized_return,
+            sharpe_ratio=sharpe,
+            max_drawdown_pct=max_dd,
+            correlation_avg=avg_correlation,
+            diversification_benefit=diversification_benefit,
+            total_rebalancing_events=len(rebalancing_events),
+            total_rebalancing_fees=total_rebalancing_fees,
+            rebalancing_events=rebalancing_events,
+            equity_curve=equity_curve_data
+        )
+
+        logger.info(
+            f"Portfolio backtest complete: {len(request.symbols)} symbols, "
+            f"{len(rebalancing_events)} rebalancing events, "
+            f"Total return: {total_return_pct:+.2f}%"
+        )
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Portfolio backtest error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Portfolio backtest failed: {str(e)}"
         )

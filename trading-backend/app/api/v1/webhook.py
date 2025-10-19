@@ -21,6 +21,7 @@ from app.services.order_executor import order_executor, Exchange
 from app.core.config import settings
 from app.services.telegram_service import telegram_service
 from app.api.v1.telegram import get_telegram_chat_id
+from app.core.symbols import symbol_config
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,6 @@ VALID_ACTIONS = {"long", "short", "close_long", "close_short", "close_all"}
 VALID_EXCHANGES = {"binance", "okx"}
 MAX_LEVERAGE = 125  # Binance max leverage
 MIN_LEVERAGE = 1
-SYMBOL_PATTERN = re.compile(r'^[A-Z0-9]{3,12}USDT$')  # 심볼 패턴 (예: BTCUSDT, ETHUSDT)
 
 
 class TradingViewWebhook(BaseModel):
@@ -63,11 +63,27 @@ class TradingViewWebhook(BaseModel):
         return v.lower()
 
     @validator('symbol')
-    def validate_symbol(cls, v):
-        """심볼 검증 (USDT 페어만 허용)"""
+    def validate_symbol(cls, v, values):
+        """
+        심볼 검증 (지원 심볼만 허용)
+
+        지원: BTC, ETH, SOL, ADA (USDT 선물)
+        """
         symbol_upper = v.upper()
-        if not SYMBOL_PATTERN.match(symbol_upper):
-            raise ValueError(f"Invalid symbol format. Must be [COIN]USDT (e.g., BTCUSDT, ETHUSDT)")
+        exchange = values.get('exchange', 'binance').lower()
+
+        # 거래소별 심볼 검증
+        if not symbol_config.validate_symbol(symbol_upper, exchange):
+            supported = ", ".join([
+                symbol_config.get_binance_symbol(s) if exchange == 'binance'
+                else symbol_config.get_okx_symbol(s)
+                for s in symbol_config.SUPPORTED_SYMBOLS
+            ])
+            raise ValueError(
+                f"Unsupported symbol: {symbol_upper}. "
+                f"Supported symbols for {exchange}: {supported}"
+            )
+
         return symbol_upper
 
     @validator('timestamp')

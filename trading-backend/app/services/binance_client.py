@@ -51,7 +51,7 @@ class BinanceClient:
         return signature
 
     @with_retry(max_attempts=3, strategy=RetryStrategy.EXPONENTIAL)
-    @with_timeout(timeout_seconds=10.0)
+    @with_timeout(10.0)
     def _request(
         self,
         method: str,
@@ -362,6 +362,24 @@ class BinanceClient:
         """현재 시장가 조회"""
         result = self._request("GET", f"/fapi/v1/ticker/price", params={"symbol": symbol})
         return float(result["price"])
+
+    def get_24h_ticker(self, symbol: str) -> Dict[str, Any]:
+        """24시간 통계 조회"""
+        result = self._request("GET", "/fapi/v1/ticker/24hr", params={"symbol": symbol})
+
+        return {
+            "symbol": result["symbol"],
+            "price_change": float(result["priceChange"]),
+            "price_change_percent": float(result["priceChangePercent"]),
+            "last_price": float(result["lastPrice"]),
+            "high_price": float(result["highPrice"]),
+            "low_price": float(result["lowPrice"]),
+            "volume": float(result["volume"]),
+            "quote_volume": float(result["quoteVolume"]),
+            "open_time": result["openTime"],
+            "close_time": result["closeTime"],
+            "count": result["count"]  # 거래 횟수
+        }
 
     def validate_credentials(self) -> Dict[str, Any]:
         """

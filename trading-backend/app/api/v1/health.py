@@ -339,3 +339,48 @@ async def get_system_metrics():
             status_code=500,
             detail=f"시스템 지표 조회 중 오류가 발생했습니다: {str(e)}"
         )
+
+
+@router.get("/health/websocket")
+async def get_websocket_stats():
+    """
+    WebSocket 연결 풀 및 재연결 통계
+
+    Returns:
+    - 연결 풀 상태 (거래소별)
+    - 재연결 통계
+    - 워커 간 통신 상태
+    """
+
+    try:
+        from app.services.websocket_pool import websocket_pool
+        from app.services.websocket_reconnect import websocket_reconnector
+        from app.services.websocket_manager import websocket_manager
+
+        # 연결 풀 통계
+        pool_stats = websocket_pool.get_pool_stats()
+
+        # 재연결 통계
+        reconnect_stats = websocket_reconnector.get_reconnect_stats()
+
+        # 코디네이터 통계
+        coordinator_stats = {}
+        if websocket_manager.coordinator:
+            coordinator_stats = websocket_manager.coordinator.get_coordinator_stats()
+
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "connection_pool": pool_stats,
+            "reconnection": reconnect_stats,
+            "coordinator": coordinator_stats,
+            "active_frontend_connections": len(websocket_manager.active_connections),
+            "active_streams": len(websocket_manager.active_streams),
+            "subscribed_symbols": len(websocket_manager.subscribed_symbols)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get WebSocket stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"WebSocket 통계 조회 중 오류가 발생했습니다: {str(e)}"
+        )

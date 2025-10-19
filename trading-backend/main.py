@@ -21,14 +21,19 @@ app = FastAPI(
 from app.core.exceptions import register_exception_handlers
 register_exception_handlers(app)
 
-# CORS configuration
+# CORS configuration (Docker-compatible)
+# Read from environment variable (comma-separated)
+cors_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+logger.info(f"CORS enabled for origins: {cors_origins}")
 
 
 @app.get("/")
@@ -66,6 +71,11 @@ async def startup_event():
     """Initialize services on startup"""
     logger.info("Starting TradingBot AI Backend...")
 
+    # Initialize database (with Slow Query Logger)
+    logger.info("Initializing database connection...")
+    from app.database.base import engine
+    logger.info("✅ Database initialized with query performance monitoring")
+
     # Initialize cache system
     from app.core.cache import initialize_cache, cache_cleanup_task
     import asyncio
@@ -77,12 +87,47 @@ async def startup_event():
     logger.info("Starting background cache cleanup task...")
     asyncio.create_task(cache_cleanup_task())
 
+    # Initialize Redis client
+    logger.info("Initializing Redis client...")
+    from app.core.redis_client import RedisClient
+    try:
+        await RedisClient.get_client()
+        logger.info("✅ Redis client initialized successfully")
+    except Exception as e:
+        logger.warning(f"⚠️ Redis initialization failed: {e}. Caching will be disabled.")
+
+    # Start risk monitoring service
+    logger.info("Starting risk monitoring service...")
+    from app.workers.risk_monitor import start_risk_monitor
+    asyncio.create_task(start_risk_monitor())
+
+    # Initialize WebSocket connection pool
+    logger.info("Initializing WebSocket connection pool...")
+    from app.services.websocket_pool import websocket_pool
+    await websocket_pool.start()
+    logger.info("✅ WebSocket connection pool started")
+
+    # Initialize WebSocket coordinator (worker communication)
+    logger.info("Initializing WebSocket coordinator...")
+    from app.services.websocket_manager import websocket_manager
+    from app.core.redis_pubsub import WebSocketCoordinator
+    websocket_manager.coordinator = WebSocketCoordinator(websocket_manager.worker_id)
+    await websocket_manager.coordinator.start()
+    logger.info(f"✅ WebSocket coordinator started (worker: {websocket_manager.worker_id})")
+
     # TODO: Initialize market monitor for selected symbols
     # from app.workers.market_monitor import MarketMonitor
     # market_monitor = MarketMonitor(symbols=["BTCUSDT", "ETHUSDT"])
     # await market_monitor.start()
 
-    logger.info("Backend started successfully with caching enabled")
+    logger.info(
+        "✅ Backend started successfully with:\n"
+        "  - Database query optimization (18 indexes + slow query monitoring)\n"
+        "  - Redis caching system\n"
+        "  - WebSocket connection pooling and scaling\n"
+        "  - Risk monitoring\n"
+        "  - Worker coordination (Redis Pub/Sub)"
+    )
 
 
 @app.on_event("shutdown")
@@ -90,18 +135,37 @@ async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("Shutting down TradingBot AI Backend...")
 
+    # Stop risk monitoring service
+    from app.workers.risk_monitor import stop_risk_monitor
+    await stop_risk_monitor()
+
+    # Stop WebSocket coordinator and connection pool
+    from app.services.websocket_manager import websocket_manager
+    from app.services.websocket_pool import websocket_pool
+
+    logger.info("Stopping WebSocket coordinator...")
+    if websocket_manager.coordinator:
+        await websocket_manager.coordinator.stop()
+
+    logger.info("Stopping WebSocket connection pool...")
+    await websocket_pool.stop()
+
+    logger.info("Closing WebSocket connections...")
+    await websocket_manager.close()
+
+    # Close Redis connection
+    from app.core.redis_client import RedisClient
+    await RedisClient.close()
+    logger.info("Redis client closed")
+
     # TODO: Stop market monitor
     # await market_monitor.stop()
 
-    # Close WebSocket connections
-    from app.services.websocket_manager import websocket_manager
-    await websocket_manager.close()
-
-    logger.info("Backend shutdown complete")
+    logger.info("✅ Backend shutdown complete")
 
 
 # Import and include API routers
-from app.api.v1 import trading, websocket as ws_router, strategies, backtest, simple, health, performance, optimize, webhook, accounts, accounts_secure, telegram, pine_script
+from app.api.v1 import trading, websocket as ws_router, strategies, backtest, simple, health, performance, optimize, webhook, accounts, accounts_secure, telegram, pine_script, symbols, market, positions, portfolio, ai_prediction, signal
 
 # Health monitoring (system stability status)
 app.include_router(
@@ -164,6 +228,48 @@ app.include_router(
     pine_script.router,
     prefix=f"{settings.API_V1_PREFIX}",
     tags=["🤖 AI Pine Script Generator"]
+)
+
+# AI Price Prediction API (LSTM Deep Learning)
+app.include_router(
+    ai_prediction.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["🧠 AI Price Prediction (LSTM)"]
+)
+
+# Real-time Signal Generation API (LSTM + Technical + LLM)
+app.include_router(
+    signal.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["🎯 Real-time Trading Signals (AI Ensemble)"]
+)
+
+# Symbol Management API (Multi-Coin Support)
+app.include_router(
+    symbols.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["📊 Symbol Management"]
+)
+
+# Market Data API (Real-time Prices & 24h Stats)
+app.include_router(
+    market.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["📈 Market Data"]
+)
+
+# Position Management API (Multi-Symbol & Portfolio)
+app.include_router(
+    positions.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["💼 Position Management"]
+)
+
+# Portfolio Analysis API (Advanced Features)
+app.include_router(
+    portfolio.router,
+    prefix=f"{settings.API_V1_PREFIX}/portfolio",
+    tags=["📊 Portfolio Analysis (Advanced)"]
 )
 
 app.include_router(
