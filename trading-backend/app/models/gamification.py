@@ -15,7 +15,7 @@ class XpTransaction(Base):
     amount = Column(Integer, nullable=False)  # XP change amount
     reason = Column(String, nullable=False)  # WIN, LOSS, STREAK_BONUS, BADGE_EARNED
     description = Column(String, nullable=True)
-    metadata = Column(JSON, nullable=True)  # Additional info (trade ID, badge type, etc.)
+    meta_info = Column(JSON, nullable=True)  # Additional info (trade ID, badge type, etc.)
     created_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)
 
     # Relationships
