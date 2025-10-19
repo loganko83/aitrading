@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from app.core.config import settings
 import logging
 
@@ -33,7 +34,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# GZIP Compression for API responses
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=500  # Compress responses larger than 500 bytes
+)
+
 logger.info(f"CORS enabled for origins: {cors_origins}")
+logger.info("GZIP compression enabled for responses > 500 bytes")
 
 
 @app.get("/")
@@ -43,7 +51,7 @@ async def root():
         "status": "ok",
         "app": settings.APP_NAME,
         "testnet": settings.BINANCE_TESTNET,
-        "version": "1.1.0",
+        "version": "1.2.0",
         "features": {
             "stability": {
                 "retry_logic": "enabled",
@@ -54,7 +62,8 @@ async def root():
             "performance": {
                 "caching": "enabled",
                 "performance_tracking": "enabled",
-                "cache_warmup": "enabled"
+                "cache_warmup": "enabled",
+                "gzip_compression": "enabled"
             },
             "optimization": {
                 "preset_system": "enabled",
