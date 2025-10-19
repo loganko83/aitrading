@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     BINANCE_API_SECRET: str
     BINANCE_TESTNET: bool = True
 
+    # OKX API
+    OKX_API_KEY: str = ""
+    OKX_API_SECRET: str = ""
+    OKX_PASSPHRASE: str = ""
+    OKX_TESTNET: bool = True
+
     # AI APIs
     OPENAI_API_KEY: str
     ANTHROPIC_API_KEY: str
@@ -33,6 +39,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     WEBHOOK_SECRET: str  # TradingView webhook verification key
     ENCRYPTION_KEY: Optional[str] = None  # API key encryption (Fernet key)
+    ENCRYPTION_SALT: Optional[str] = None  # Salt for key derivation (base64-encoded)
 
     # Trading Parameters
     DEFAULT_LEVERAGE: int = 3
@@ -105,9 +112,16 @@ class Settings(BaseSettings):
         if not self.ENCRYPTION_KEY or "generate" in self.ENCRYPTION_KEY.lower():
             errors.append("ENCRYPTION_KEY must be set and secure in production")
 
+        # ENCRYPTION_KEY가 없을 때 ENCRYPTION_SALT는 필수
+        if not self.ENCRYPTION_KEY and (not self.ENCRYPTION_SALT or "generate" in self.ENCRYPTION_SALT.lower()):
+            errors.append("ENCRYPTION_SALT must be set when ENCRYPTION_KEY is not provided in production")
+
         # 프로덕션에서는 테스트넷 사용 불가 (경고만)
         if self.BINANCE_TESTNET:
             print("⚠️  WARNING: BINANCE_TESTNET is True in production - ensure this is intentional")
+
+        if self.OKX_TESTNET:
+            print("⚠️  WARNING: OKX_TESTNET is True in production - ensure this is intentional")
 
         if errors:
             raise ValueError(f"Production configuration errors: {', '.join(errors)}")

@@ -44,12 +44,36 @@ class CryptoService:
             encryption_key = getattr(settings, 'ENCRYPTION_KEY', None)
 
             if not encryption_key:
-                # ENCRYPTION_KEY가 없으면 SECRET_KEY 기반으로 생성
+                # ENCRYPTION_KEY가 없으면 SECRET_KEY + ENCRYPTION_SALT 기반으로 생성
                 logger.warning("ENCRYPTION_KEY not found, deriving from SECRET_KEY")
+
+                # ENCRYPTION_SALT 환경변수 확인
+                encryption_salt = getattr(settings, 'ENCRYPTION_SALT', None)
+
+                if not encryption_salt:
+                    # 프로덕션 환경에서는 ENCRYPTION_SALT 필수
+                    if getattr(settings, 'is_production', False):
+                        raise ValueError(
+                            "ENCRYPTION_SALT is required in production when ENCRYPTION_KEY is not set. "
+                            "Generate a secure salt: python -c \"import secrets; import base64; "
+                            "print(base64.b64encode(secrets.token_bytes(32)).decode())\""
+                        )
+                    else:
+                        # 개발 환경에서만 경고 후 진행
+                        logger.error(
+                            "⚠️  SECURITY WARNING: ENCRYPTION_SALT not found! "
+                            "Using default salt which is NOT secure for production. "
+                            "Set ENCRYPTION_SALT in your .env file."
+                        )
+                        salt = b'tradingbot_default_salt_dev_only'  # 개발 환경 기본 salt
+                else:
+                    # Base64 디코딩
+                    salt = base64.b64decode(encryption_salt.encode())
+
                 kdf = PBKDF2HMAC(
                     algorithm=hashes.SHA256(),
                     length=32,
-                    salt=b'tradingbot_salt_do_not_change',  # 고정 salt (변경 시 기존 암호화 데이터 복호화 불가)
+                    salt=salt,
                     iterations=100000,
                     backend=default_backend()
                 )
