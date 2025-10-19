@@ -35,10 +35,10 @@ export default function LandingPage() {
 
           <div className="flex items-center space-x-4">
             <Link href="/login">
-              <Button variant="ghost">로그인</Button>
+              <Button variant="ghost">Login</Button>
             </Link>
             <Link href="/signup">
-              <Button className="shadow-lg">시작하기</Button>
+              <Button className="shadow-lg">Get Started</Button>
             </Link>
           </div>
         </div>
@@ -48,26 +48,26 @@ export default function LandingPage() {
       <section className="container mx-auto px-4 py-20 text-center">
         <Badge className="mb-4 shadow-sm" variant="secondary">
           <Zap className="w-3 h-3 mr-1 inline" />
-          TradingView Webhook 자동 매매
+          TradingView Webhook Automation
         </Badge>
         <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-          자동 트레이딩의 새로운 기준
+          The New Standard in Automated Trading
         </h1>
         <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed">
-          TradingView Pine Script에서 생성된 시그널을 Webhook으로 받아
-          <span className="font-semibold text-foreground"> Binance와 OKX Futures에서 즉시 자동 실행</span>합니다.
-          AI가 생성한 6가지 검증된 전략과 백테스팅으로 안정적인 수익을 추구하세요.
+          Receive signals generated from TradingView Pine Script via Webhook and
+          <span className="font-semibold text-foreground"> execute instantly on Binance and OKX Futures</span>.
+          Pursue stable profits with 6 AI-generated verified strategies and backtesting.
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
           <Link href="/signup">
             <Button size="lg" className="text-lg px-8 shadow-lg hover:shadow-xl transition-all">
               <Rocket className="mr-2" size={20} />
-              무료로 시작하기
+              Start Free
             </Button>
           </Link>
           <Link href="#features">
             <Button size="lg" variant="outline" className="text-lg px-8">
-              자세히 알아보기
+              Learn More
             </Button>
           </Link>
         </div>
@@ -76,19 +76,19 @@ export default function LandingPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-4xl mx-auto">
           <Card className="p-6 border-primary/20 shadow-md hover:shadow-lg transition-shadow">
             <div className="text-3xl font-bold text-primary mb-2">6</div>
-            <div className="text-sm text-muted-foreground">검증된 AI 전략</div>
+            <div className="text-sm text-muted-foreground">Verified AI Strategies</div>
           </Card>
           <Card className="p-6 border-primary/20 shadow-md hover:shadow-lg transition-shadow">
             <div className="text-3xl font-bold text-primary mb-2">2</div>
-            <div className="text-sm text-muted-foreground">거래소 지원</div>
+            <div className="text-sm text-muted-foreground">Exchange Support</div>
           </Card>
           <Card className="p-6 border-primary/20 shadow-md hover:shadow-lg transition-shadow">
             <div className="text-3xl font-bold text-primary mb-2">18</div>
-            <div className="text-sm text-muted-foreground">DB 인덱스 최적화</div>
+            <div className="text-sm text-muted-foreground">DB Index Optimization</div>
           </Card>
           <Card className="p-6 border-primary/20 shadow-md hover:shadow-lg transition-shadow">
             <div className="text-3xl font-bold text-primary mb-2">24/7</div>
-            <div className="text-sm text-muted-foreground">자동 모니터링</div>
+            <div className="text-sm text-muted-foreground">Automated Monitoring</div>
           </Card>
         </div>
       </section>
@@ -96,9 +96,9 @@ export default function LandingPage() {
       {/* Key Features Section */}
       <section id="features" className="container mx-auto px-4 py-20 bg-gradient-to-b from-transparent to-secondary/10 rounded-3xl">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">핵심 기능</h2>
+          <h2 className="text-4xl font-bold mb-4">Key Features</h2>
           <p className="text-muted-foreground text-lg">
-            전문 트레이더를 위한 완전 자동화 시스템
+            Fully automated system for professional traders
           </p>
         </div>
 
@@ -110,11 +110,11 @@ export default function LandingPage() {
             </div>
             <h3 className="text-xl font-bold mb-2">TradingView Webhook</h3>
             <p className="text-muted-foreground mb-3">
-              Pine Script 시그널을 Webhook으로 수신하여 0.1초 내 자동 주문 실행. 시장가/지정가 모두 지원.
+              Receive Pine Script signals via Webhook and execute orders automatically within 0.1 seconds. Supports both market and limit orders.
             </p>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline">즉시 실행</Badge>
-              <Badge variant="outline">안전한 인증</Badge>
+              <Badge variant="outline">Instant Execution</Badge>
+              <Badge variant="outline">Secure Auth</Badge>
             </div>
           </Card>
 
@@ -123,9 +123,9 @@ export default function LandingPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mb-4">
               <Database className="text-primary" size={24} />
             </div>
-            <h3 className="text-xl font-bold mb-2">2개 거래소 지원</h3>
+            <h3 className="text-xl font-bold mb-2">2 Exchange Support</h3>
             <p className="text-muted-foreground mb-3">
-              Binance Futures와 OKX Futures 모두 지원. 레버리지, Stop Loss, Take Profit 완벽 제어.
+              Supports both Binance Futures and OKX Futures. Perfect control of leverage, Stop Loss, and Take Profit.
             </p>
             <div className="flex gap-2 flex-wrap">
               <Badge variant="outline">Binance</Badge>
@@ -138,13 +138,13 @@ export default function LandingPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mb-4">
               <Bot className="text-primary" size={24} />
             </div>
-            <h3 className="text-xl font-bold mb-2">6가지 AI 전략</h3>
+            <h3 className="text-xl font-bold mb-2">6 AI Strategies</h3>
             <p className="text-muted-foreground mb-3">
-              SuperTrend, RSI+EMA, MACD, Ichimoku, Bollinger Bands 등 검증된 전략을 AI가 자동 생성 및 최적화.
+              Verified strategies including SuperTrend, RSI+EMA, MACD, Ichimoku, and Bollinger Bands, automatically generated and optimized by AI.
             </p>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline">백테스팅</Badge>
-              <Badge variant="outline">AI 최적화</Badge>
+              <Badge variant="outline">Backtesting</Badge>
+              <Badge variant="outline">AI Optimized</Badge>
             </div>
           </Card>
 
@@ -153,13 +153,13 @@ export default function LandingPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mb-4">
               <LineChart className="text-primary" size={24} />
             </div>
-            <h3 className="text-xl font-bold mb-2">백테스팅 엔진</h3>
+            <h3 className="text-xl font-bold mb-2">Backtesting Engine</h3>
             <p className="text-muted-foreground mb-3">
-              과거 데이터로 전략 성과 검증. 승률, 손익비율, MDD, Sharpe Ratio 등 상세 분석 제공.
+              Validate strategy performance with historical data. Detailed analysis including win rate, profit ratio, MDD, and Sharpe Ratio.
             </p>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline">승률 분석</Badge>
-              <Badge variant="outline">리스크 지표</Badge>
+              <Badge variant="outline">Win Rate Analysis</Badge>
+              <Badge variant="outline">Risk Metrics</Badge>
             </div>
           </Card>
 
@@ -168,13 +168,13 @@ export default function LandingPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mb-4">
               <Bell className="text-primary" size={24} />
             </div>
-            <h3 className="text-xl font-bold mb-2">텔레그램 실시간 알림</h3>
+            <h3 className="text-xl font-bold mb-2">Telegram Real-time Alerts</h3>
             <p className="text-muted-foreground mb-3">
-              주문 체결, 손익 변동, 에러 발생 시 즉시 텔레그램으로 알림. 언제 어디서나 모니터링.
+              Instant Telegram notifications for order fills, profit/loss changes, and errors. Monitor anytime, anywhere.
             </p>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline">실시간</Badge>
-              <Badge variant="outline">맞춤 설정</Badge>
+              <Badge variant="outline">Real-time</Badge>
+              <Badge variant="outline">Customizable</Badge>
             </div>
           </Card>
 
@@ -183,13 +183,13 @@ export default function LandingPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mb-4">
               <Shield className="text-primary" size={24} />
             </div>
-            <h3 className="text-xl font-bold mb-2">AES-256 암호화</h3>
+            <h3 className="text-xl font-bold mb-2">AES-256 Encryption</h3>
             <p className="text-muted-foreground mb-3">
-              거래소 API 키를 군사급 암호화로 보호. NextAuth 인증, Redis JWT 블랙리스트로 이중 보안.
+              Protect exchange API keys with military-grade encryption. Dual security with NextAuth authentication and Redis JWT blacklist.
             </p>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline">암호화</Badge>
-              <Badge variant="outline">2FA 지원</Badge>
+              <Badge variant="outline">Encrypted</Badge>
+              <Badge variant="outline">2FA Support</Badge>
             </div>
           </Card>
 
@@ -198,13 +198,13 @@ export default function LandingPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mb-4">
               <Activity className="text-primary" size={24} />
             </div>
-            <h3 className="text-xl font-bold mb-2">성능 최적화</h3>
+            <h3 className="text-xl font-bold mb-2">Performance Optimized</h3>
             <p className="text-muted-foreground mb-3">
-              Redis 캐싱, 18개 DB 복합 인덱스, GZIP 압축으로 초고속 응답 속도 보장.
+              Ultra-fast response guaranteed with Redis caching, 18 DB composite indexes, and GZIP compression.
             </p>
             <div className="flex gap-2 flex-wrap">
               <Badge variant="outline">Redis</Badge>
-              <Badge variant="outline">인덱스</Badge>
+              <Badge variant="outline">Indexed</Badge>
             </div>
           </Card>
 
@@ -213,13 +213,13 @@ export default function LandingPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mb-4">
               <Target className="text-primary" size={24} />
             </div>
-            <h3 className="text-xl font-bold mb-2">포트폴리오 분석</h3>
+            <h3 className="text-xl font-bold mb-2">Portfolio Analysis</h3>
             <p className="text-muted-foreground mb-3">
-              다중 심볼 포지션 관리, 실시간 손익 추적, 위험도 분석으로 체계적인 자금 관리.
+              Multi-symbol position management, real-time P&L tracking, and risk analysis for systematic capital management.
             </p>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline">다중 심볼</Badge>
-              <Badge variant="outline">리스크 관리</Badge>
+              <Badge variant="outline">Multi-Symbol</Badge>
+              <Badge variant="outline">Risk Management</Badge>
             </div>
           </Card>
 
@@ -228,13 +228,13 @@ export default function LandingPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mb-4">
               <Code className="text-primary" size={24} />
             </div>
-            <h3 className="text-xl font-bold mb-2">Pine Script AI 생성</h3>
+            <h3 className="text-xl font-bold mb-2">Pine Script AI Generator</h3>
             <p className="text-muted-foreground mb-3">
-              전략을 설명하면 AI가 자동으로 Pine Script 코드 생성. TradingView에 바로 적용 가능.
+              Describe your strategy and AI automatically generates Pine Script code. Ready to apply directly on TradingView.
             </p>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline">자동 생성</Badge>
-              <Badge variant="outline">커스터마이징</Badge>
+              <Badge variant="outline">Auto Generate</Badge>
+              <Badge variant="outline">Customizable</Badge>
             </div>
           </Card>
         </div>
@@ -243,9 +243,9 @@ export default function LandingPage() {
       {/* How It Works - Workflow */}
       <section className="container mx-auto px-4 py-20">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">작동 원리</h2>
+          <h2 className="text-4xl font-bold mb-4">How It Works</h2>
           <p className="text-muted-foreground text-lg">
-            4단계로 완성되는 완전 자동 트레이딩
+            Fully automated trading in 4 simple steps
           </p>
         </div>
 
@@ -258,11 +258,11 @@ export default function LandingPage() {
               <div className="flex-1">
                 <h3 className="text-xl font-bold mb-2 flex items-center">
                   <Lock className="mr-2 text-primary" size={20} />
-                  API 키 등록
+                  Register API Keys
                 </h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  Binance 또는 OKX API 키를 AES-256 암호화로 안전하게 등록합니다.
-                  Testnet 환경에서 먼저 테스트 가능하며, 2FA 인증으로 이중 보안을 제공합니다.
+                  Securely register Binance or OKX API keys with AES-256 encryption.
+                  Test in Testnet environment first, with dual security via 2FA authentication.
                 </p>
               </div>
             </div>
@@ -276,11 +276,11 @@ export default function LandingPage() {
               <div className="flex-1">
                 <h3 className="text-xl font-bold mb-2 flex items-center">
                   <Bot className="mr-2 text-primary" size={20} />
-                  전략 선택 & Pine Script 생성
+                  Choose Strategy & Generate Pine Script
                 </h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  6가지 검증된 전략 중 선택하거나 AI에게 전략을 설명하여 Pine Script 자동 생성.
-                  백테스팅으로 과거 성과를 확인한 후 TradingView에 적용합니다.
+                  Select from 6 verified strategies or describe your strategy to AI for automatic Pine Script generation.
+                  Verify past performance with backtesting, then apply to TradingView.
                 </p>
               </div>
             </div>
@@ -294,11 +294,11 @@ export default function LandingPage() {
               <div className="flex-1">
                 <h3 className="text-xl font-bold mb-2 flex items-center">
                   <Zap className="mr-2 text-primary" size={20} />
-                  Webhook 알림 설정
+                  Set Up Webhook Alert
                 </h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  TradingView 차트에서 알림 생성 시 Webhook URL과 인증 키를 입력합니다.
-                  시그널 발생 시 자동으로 백엔드로 POST 요청이 전송됩니다.
+                  Enter Webhook URL and authentication key when creating alerts in TradingView chart.
+                  POST requests are automatically sent to the backend when signals occur.
                 </p>
               </div>
             </div>
@@ -312,11 +312,11 @@ export default function LandingPage() {
               <div className="flex-1">
                 <h3 className="text-xl font-bold mb-2 flex items-center">
                   <CheckCircle2 className="mr-2 text-primary" size={20} />
-                  자동 주문 실행 & 알림
+                  Auto Order Execution & Alerts
                 </h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  시그널 수신 → 검증 → 주문 실행 → 텔레그램 알림까지 0.1초 내 완료.
-                  Stop Loss/Take Profit 자동 설정으로 리스크 관리도 완벽합니다.
+                  Signal reception → Validation → Order execution → Telegram notification completed within 0.1 seconds.
+                  Perfect risk management with automatic Stop Loss/Take Profit settings.
                 </p>
               </div>
             </div>
@@ -328,9 +328,9 @@ export default function LandingPage() {
       <section className="bg-secondary/30 py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4">기술 스택</h2>
+            <h2 className="text-4xl font-bold mb-4">Technology Stack</h2>
             <p className="text-muted-foreground text-lg">
-              최신 기술로 구축된 엔터프라이즈급 시스템
+              Enterprise-grade system built with cutting-edge technology
             </p>
           </div>
 
@@ -374,21 +374,21 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="bg-gradient-to-r from-primary via-primary/90 to-primary/80 text-primary-foreground py-20">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl font-bold mb-4">지금 바로 시작하세요</h2>
+          <h2 className="text-4xl font-bold mb-4">Start Trading Now</h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            TradingView Webhook으로 완전 자동화된 트레이딩 시스템을 경험하세요.
-            Testnet 환경에서 무료로 테스트할 수 있습니다.
+            Experience fully automated trading system with TradingView Webhook.
+            Test for free in Testnet environment.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link href="/signup">
               <Button size="lg" variant="secondary" className="text-lg px-8 shadow-xl">
                 <Rocket className="mr-2" size={20} />
-                무료 계정 만들기
+                Create Free Account
               </Button>
             </Link>
             <Link href="/login">
               <Button size="lg" variant="outline" className="text-lg px-8 bg-transparent hover:bg-primary-foreground/10 text-primary-foreground border-primary-foreground/30">
-                이미 계정이 있으신가요?
+                Already have an account?
               </Button>
             </Link>
           </div>
@@ -405,25 +405,25 @@ export default function LandingPage() {
                 TradingBot AI
               </h4>
               <p className="text-sm text-muted-foreground">
-                TradingView Webhook 기반 완전 자동화 트레이딩 시스템
+                Fully automated trading system based on TradingView Webhook
               </p>
             </div>
             <div>
-              <h4 className="font-bold mb-4">주요 기능</h4>
+              <h4 className="font-bold mb-4">Key Features</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>• TradingView Webhook</li>
-                <li>• Binance/OKX 거래소</li>
-                <li>• 6가지 AI 전략</li>
-                <li>• 백테스팅 엔진</li>
+                <li>• Binance/OKX Exchange</li>
+                <li>• 6 AI Strategies</li>
+                <li>• Backtesting Engine</li>
               </ul>
             </div>
             <div>
-              <h4 className="font-bold mb-4">보안 & 성능</h4>
+              <h4 className="font-bold mb-4">Security & Performance</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>• AES-256 암호화</li>
-                <li>• Redis 캐싱</li>
-                <li>• 18개 DB 인덱스</li>
-                <li>• GZIP 압축</li>
+                <li>• AES-256 Encryption</li>
+                <li>• Redis Caching</li>
+                <li>• 18 DB Indexes</li>
+                <li>• GZIP Compression</li>
               </ul>
             </div>
           </div>
@@ -431,7 +431,7 @@ export default function LandingPage() {
           <div className="border-t pt-8 text-center text-muted-foreground">
             <p className="mb-2">© 2025 TradingBot AI. All rights reserved.</p>
             <p className="text-sm">
-              ⚠️ 암호화폐 거래는 높은 리스크를 수반합니다. 투자 손실 가능성을 충분히 이해하신 후 이용하시기 바랍니다.
+              ⚠️ Cryptocurrency trading involves high risk. Please fully understand the possibility of investment loss before use.
             </p>
           </div>
         </div>
