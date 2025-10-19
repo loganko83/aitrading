@@ -23,6 +23,7 @@ from app.core.totp_service import (
     verify_2fa_login
 )
 from app.core.dependencies import get_current_user, get_current_active_user, get_user_id
+from app.core.redis_client import redis_cache
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -450,6 +451,7 @@ async def refresh_token(request: RefreshTokenRequest):
 
     - Refresh Token으로 새 Access Token 발급
     - Refresh Token은 7일 유효
+    - 블랙리스트에 있는 토큰은 거부
 
     Args:
     - **refresh_token**: Refresh Token
@@ -457,6 +459,18 @@ async def refresh_token(request: RefreshTokenRequest):
     Returns:
     - 새로운 Access Token
     """
+    # Refresh Token 블랙리스트 체크
+    is_blacklisted = await redis_cache.is_token_blacklisted(
+        token=request.refresh_token,
+        token_type="refresh"
+    )
+
+    if is_blacklisted:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="이 Refresh Token은 무효화되었습니다. 다시 로그인하세요."
+        )
+
     # Refresh Token으로 새 Access Token 생성
     new_access_token = refresh_access_token(request.refresh_token)
 
@@ -478,8 +492,8 @@ async def logout(request: LogoutRequest):
     """
     로그아웃
 
-    - 현재는 클라이언트에서 토큰 삭제 권장
-    - (향후) Redis 블랙리스트 추가 예정
+    - Refresh Token을 블랙리스트에 추가 (Redis)
+    - Access Token은 클라이언트에서 삭제 권장 (짧은 만료 시간)
 
     Args:
     - **refresh_token**: Refresh Token (선택)
@@ -487,13 +501,35 @@ async def logout(request: LogoutRequest):
     Returns:
     - 로그아웃 확인
     """
-    # TODO: Redis 블랙리스트에 토큰 추가
-    # 현재는 클라이언트에서 토큰을 삭제하는 방식 권장
+    # Refresh Token을 블랙리스트에 추가
+    if request.refresh_token:
+        try:
+            # Refresh Token 블랙리스트 추가 (TTL: 7일)
+            await redis_cache.add_token_to_blacklist(
+                token=request.refresh_token,
+                token_type="refresh",
+                ttl=604800  # 7일 (Refresh Token 만료 시간)
+            )
+            logger.info("Refresh token added to blacklist")
 
-    return LogoutResponse(
-        success=True,
-        message="로그아웃되었습니다. 토큰을 삭제하세요."
-    )
+            return LogoutResponse(
+                success=True,
+                message="로그아웃되었습니다. Refresh Token이 무효화되었습니다."
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to add token to blacklist: {str(e)}")
+            # Redis 실패 시에도 로그아웃 성공으로 처리 (클라이언트 토큰 삭제 권장)
+            return LogoutResponse(
+                success=True,
+                message="로그아웃되었습니다. 토큰을 삭제하세요."
+            )
+    else:
+        # Refresh Token이 없으면 클라이언트에서 Access Token만 삭제
+        return LogoutResponse(
+            success=True,
+            message="로그아웃되었습니다. 토큰을 삭제하세요."
+        )
 
 
 @router.get("/me")

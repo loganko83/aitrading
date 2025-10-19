@@ -240,6 +240,95 @@ class RedisCache:
             logger.error(f"Redis DECREMENT error for key '{key}': {e}")
             return 0
 
+    # ==================== Token Blacklist ====================
+
+    async def add_token_to_blacklist(
+        self,
+        token: str,
+        token_type: str = "refresh",
+        ttl: Optional[int] = None
+    ) -> bool:
+        """
+        토큰을 블랙리스트에 추가
+
+        Args:
+            token: JWT 토큰
+            token_type: "access" 또는 "refresh"
+            ttl: TTL (초), None이면 기본값 사용 (refresh: 7일, access: 30분)
+
+        Returns:
+            성공 여부
+        """
+        try:
+            # TTL 설정 (refresh: 7일, access: 30분)
+            if ttl is None:
+                ttl = 604800 if token_type == "refresh" else 1800
+
+            key = f"blacklist:{token_type}:{token}"
+            await self.set(key, "revoked", ttl=ttl, use_json=False)
+
+            logger.info(f"✅ Token added to blacklist: {token_type} (TTL: {ttl}s)")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to add token to blacklist: {str(e)}")
+            return False
+
+    async def is_token_blacklisted(self, token: str, token_type: str = "refresh") -> bool:
+        """
+        토큰이 블랙리스트에 있는지 확인
+
+        Args:
+            token: JWT 토큰
+            token_type: "access" 또는 "refresh"
+
+        Returns:
+            블랙리스트에 있으면 True
+        """
+        try:
+            key = f"blacklist:{token_type}:{token}"
+            return await self.exists(key)
+
+        except Exception as e:
+            logger.error(f"Failed to check token blacklist: {str(e)}")
+            # 에러 발생 시 안전하게 False 반환 (블랙리스트 체크 실패)
+            return False
+
+    async def remove_token_from_blacklist(self, token: str, token_type: str = "refresh") -> bool:
+        """
+        토큰을 블랙리스트에서 제거
+
+        Args:
+            token: JWT 토큰
+            token_type: "access" 또는 "refresh"
+
+        Returns:
+            성공 여부
+        """
+        try:
+            key = f"blacklist:{token_type}:{token}"
+            result = await self.delete(key)
+
+            logger.info(f"Token removed from blacklist: {token_type}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to remove token from blacklist: {str(e)}")
+            return False
+
+    async def get_blacklist_count(self) -> int:
+        """블랙리스트에 있는 토큰 개수 조회"""
+        try:
+            client = await self._get_client()
+            count = 0
+            async for key in client.scan_iter(match="blacklist:*"):
+                count += 1
+            return count
+
+        except Exception as e:
+            logger.error(f"Failed to count blacklisted tokens: {str(e)}")
+            return 0
+
 
 # 전역 캐시 인스턴스
 redis_cache = RedisCache()
