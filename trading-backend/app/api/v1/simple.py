@@ -27,7 +27,7 @@ from app.core.exchange_config import (
     convert_symbol_format
 )
 from app.core.cache import cached, cache_manager
-from app.strategies.strategies import BaseStrategy, get_strategy_instance
+from app.strategies.strategies import BaseStrategy
 from app.backtesting.engine import BacktestEngine
 from app.api.v1.backtest import (
     generate_mock_ohlcv_data,

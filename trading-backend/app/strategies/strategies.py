@@ -397,7 +397,7 @@ class MACDStochStrategy(BaseStrategy):
         macd_bearish_cross = prev_macd > prev_signal and current_macd < current_signal
         stoch_bearish_cross = prev_stoch_k > prev_stoch_d and current_stoch_k < current_stoch_d
 
-        elif macd_bearish_cross and stoch_bearish_cross and current_stoch_k > 20:
+        if macd_bearish_cross and stoch_bearish_cross and current_stoch_k > 20:
             should_enter = True
             trade_direction = 'SHORT'
 
@@ -522,7 +522,7 @@ class IchimokuStrategy(BaseStrategy):
         tenkan_bearish_cross = prev_tenkan > prev_kijun and tenkan < kijun
         price_below_cloud = current_price < cloud_bottom
 
-        elif tenkan_bearish_cross and price_below_cloud:
+        if tenkan_bearish_cross and price_below_cloud:
             should_enter = True
             trade_direction = 'SHORT'
 
@@ -636,7 +636,7 @@ class WaveTrendStrategy(BaseStrategy):
         # Check for SHORT signal (bearish cross in overbought zone)
         wt_bearish_cross = prev_wt1 > prev_wt2 and current_wt1 < current_wt2
 
-        elif wt_bearish_cross and current_wt1 > 40:
+        if wt_bearish_cross and current_wt1 > 40:
             should_enter = True
             trade_direction = 'SHORT'
 

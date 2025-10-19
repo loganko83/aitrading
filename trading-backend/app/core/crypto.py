@@ -10,7 +10,7 @@ Features:
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 import base64
 import logging
@@ -46,7 +46,7 @@ class CryptoService:
             if not encryption_key:
                 # ENCRYPTION_KEY가 없으면 SECRET_KEY 기반으로 생성
                 logger.warning("ENCRYPTION_KEY not found, deriving from SECRET_KEY")
-                kdf = PBKDF2(
+                kdf = PBKDF2HMAC(
                     algorithm=hashes.SHA256(),
                     length=32,
                     salt=b'tradingbot_salt_do_not_change',  # 고정 salt (변경 시 기존 암호화 데이터 복호화 불가)

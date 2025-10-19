@@ -15,6 +15,7 @@ import logging
 
 from app.services.telegram_service import telegram_service
 from app.models.user import User
+from app.models.api_key import ApiKey
 from app.core.auth import get_current_user
 from app.database.session import get_db
 
@@ -33,6 +34,53 @@ class TelegramSettings(BaseModel):
     user_id: str
     telegram_chat_id: str
     is_active: bool
+
+
+def get_telegram_chat_id(account_id: str, db: Session = None) -> Optional[str]:
+    """
+    계정 ID로 텔레그램 채팅 ID 조회 (유틸리티 함수)
+
+    Args:
+        account_id: ApiKey ID
+        db: Database session (optional, creates new session if not provided)
+
+    Returns:
+        Telegram chat ID or None if not configured
+    """
+    from app.database.session import SessionLocal
+
+    # Create session if not provided
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    else:
+        should_close = False
+
+    try:
+        # Query ApiKey by ID
+        api_key = db.query(ApiKey).filter(ApiKey.id == account_id).first()
+
+        if not api_key:
+            logger.warning(f"ApiKey not found: {account_id}")
+            return None
+
+        # Get associated User
+        user = db.query(User).filter(User.id == api_key.user_id).first()
+
+        if not user:
+            logger.warning(f"User not found for ApiKey: {account_id}")
+            return None
+
+        # Return telegram_chat_id (may be None)
+        return user.telegram_chat_id
+
+    except Exception as e:
+        logger.error(f"Error getting telegram_chat_id for account {account_id}: {str(e)}")
+        return None
+
+    finally:
+        if should_close:
+            db.close()
 
 
 @router.post("/register", response_model=TelegramSettings)

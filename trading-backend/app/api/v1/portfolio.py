@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.database.connection import get_db
+from app.database.session import get_db
 from app.models.api_key import ApiKey
 from app.core.crypto import crypto_service
 from app.services.binance_client import BinanceClient

@@ -17,7 +17,7 @@ from app.services.order_executor import order_executor, Exchange
 from app.services.binance_client import BinanceClient
 from app.services.okx_client import OKXClient
 from app.core.crypto import crypto_service
-from app.database.db import get_db
+from app.database.session import get_db
 from sqlalchemy.orm import Session
 from app.models.api_key import ApiKey
 

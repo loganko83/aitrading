@@ -543,3 +543,34 @@ Provide trading analysis in JSON:
         ]
 
         return "\n".join(reasoning_parts)
+
+
+# Singleton instance for efficient reuse
+_ensemble_instance = None
+
+
+async def get_ai_analysis(
+    symbol: str,
+    market_data: pd.DataFrame,
+    current_price: float
+) -> EnsembleDecision:
+    """
+    Helper function to get AI analysis using Triple AI Ensemble
+
+    This is a convenience function that creates/reuses a TripleAIEnsemble instance
+    and calls its analyze method.
+
+    Args:
+        symbol: Trading pair (e.g., "BTCUSDT")
+        market_data: Historical OHLCV data
+        current_price: Current market price
+
+    Returns:
+        EnsembleDecision with final trading signal
+    """
+    global _ensemble_instance
+
+    if _ensemble_instance is None:
+        _ensemble_instance = TripleAIEnsemble()
+
+    return await _ensemble_instance.analyze(symbol, market_data, current_price)
