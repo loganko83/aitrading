@@ -51,7 +51,7 @@ export default function LandingPage() {
           TradingView Webhook Automation
         </Badge>
         <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-          The New Standard in Automated Trading
+          AI based Automatic Quant Trading
         </h1>
         <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed">
           Receive signals generated from TradingView Pine Script via Webhook and
