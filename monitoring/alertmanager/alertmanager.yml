@@ -1,14 +1,15 @@
 global:
   resolve_timeout: 5m
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
-  smtp_from: 'alerts@trendy.storydot.kr'
-  smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_auth_username: '${SMTP_USERNAME}'
-  smtp_auth_password: '${SMTP_PASSWORD}'
+  # Uncomment and configure when notification channels are ready
+  # slack_api_url: '${SLACK_WEBHOOK_URL}'
+  # smtp_from: 'alerts@trendy.storydot.kr'
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_auth_username: '${SMTP_USERNAME}'
+  # smtp_auth_password: '${SMTP_PASSWORD}'
 
 # Templates for alert notifications
-templates:
-  - '/etc/alertmanager/templates/*.tmpl'
+# templates:
+#   - '/etc/alertmanager/templates/*.tmpl'
 
 # Route alerts to different receivers based on labels
 route:
@@ -49,100 +50,28 @@ route:
 # Alert receivers configuration
 receivers:
   - name: 'default'
-    slack_configs:
-      - channel: '#trading-alerts'
-        title: '{{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+    # Default receiver logs alerts to Alertmanager UI
+    # Configure notification channels below when ready
 
   - name: 'critical-alerts'
-    slack_configs:
-      - channel: '#critical-alerts'
-        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
-        send_resolved: true
-
-    pagerduty_configs:
-      - service_key: '${PAGERDUTY_SERVICE_KEY}'
-        description: '{{ .GroupLabels.alertname }}: {{ .Annotations.summary }}'
-
-    telegram_configs:
-      - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: ${TELEGRAM_CHAT_ID}
-        message: |
-          🚨 *CRITICAL ALERT*
-
-          *Alert:* {{ .GroupLabels.alertname }}
-          *Severity:* {{ .CommonLabels.severity }}
-          *Component:* {{ .CommonLabels.component }}
-
-          {{ range .Alerts }}
-          *Summary:* {{ .Annotations.summary }}
-          *Description:* {{ .Annotations.description }}
-          *Started:* {{ .StartsAt }}
-          {{ end }}
-        parse_mode: 'Markdown'
-
-    email_configs:
-      - to: 'ops@trendy.storydot.kr'
-        subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
-        html: |
-          <h2>Critical Alert Triggered</h2>
-          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
-          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
-          <p><strong>Component:</strong> {{ .CommonLabels.component }}</p>
-
-          {{ range .Alerts }}
-          <h3>{{ .Annotations.summary }}</h3>
-          <p>{{ .Annotations.description }}</p>
-          <p><strong>Started:</strong> {{ .StartsAt }}</p>
-          {{ end }}
+    # Critical alerts receiver
+    # Add Slack, Telegram, PagerDuty, Email configs here when ready
 
   - name: 'trading-team'
-    slack_configs:
-      - channel: '#trading-team'
-        title: '📊 Trading Alert: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
-
-    telegram_configs:
-      - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: ${TELEGRAM_TRADING_CHAT_ID}
-        message: |
-          📊 *Trading Alert*
-
-          *Alert:* {{ .GroupLabels.alertname }}
-          *Severity:* {{ .CommonLabels.severity }}
-
-          {{ range .Alerts }}
-          {{ .Annotations.summary }}
-          {{ .Annotations.description }}
-          {{ end }}
-        parse_mode: 'Markdown'
+    # Trading team receiver
+    # Add notification configs when ready
 
   - name: 'dev-team'
-    slack_configs:
-      - channel: '#dev-team'
-        title: '🔧 Development Alert: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+    # Development team receiver
+    # Add notification configs when ready
 
   - name: 'ops-team'
-    slack_configs:
-      - channel: '#ops-team'
-        title: '⚙️ Operations Alert: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
-
-    email_configs:
-      - to: 'ops@trendy.storydot.kr'
-        subject: '⚙️ Ops Alert: {{ .GroupLabels.alertname }}'
+    # Operations team receiver
+    # Add notification configs when ready
 
   - name: 'business-team'
-    slack_configs:
-      - channel: '#business-metrics'
-        title: '💼 Business Alert: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
-
-    email_configs:
-      - to: 'business@trendy.storydot.kr'
-        subject: '💼 Business Metrics: {{ .GroupLabels.alertname }}'
+    # Business team receiver
+    # Add notification configs when ready
 
 # Inhibition rules
 inhibit_rules:
