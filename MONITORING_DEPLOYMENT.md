@@ -10,14 +10,14 @@
 
 ### Core Monitoring Stack
 
-| Service | Port | Status | URL |
-|---------|------|--------|-----|
-| **Prometheus** | 9090 | ✅ Running | http://13.239.192.158:9090 |
-| **Grafana** | 3002 | ✅ Running | http://13.239.192.158:3002 |
-| **Node Exporter** | 9100 | ✅ Running | http://13.239.192.158:9100/metrics |
-| **Redis Exporter** | 9121 | ✅ Running | http://13.239.192.158:9121/metrics |
-| **Postgres Exporter** | 9187 | ✅ Running | http://13.239.192.158:9187/metrics |
-| **Alertmanager** | 9093 | ✅ Running | http://13.239.192.158:9093 |
+| Service | Port | Status | HTTPS URL | Direct URL |
+|---------|------|--------|-----------|------------|
+| **Prometheus** | 9090 | ✅ Running | https://trendy.storydot.kr/monitoring/prometheus/ | http://13.239.192.158:9090 |
+| **Grafana** | 3002 | ✅ Running | https://trendy.storydot.kr/monitoring/grafana/ | http://13.239.192.158:3002 |
+| **Alertmanager** | 9093 | ✅ Running | https://trendy.storydot.kr/monitoring/alertmanager/ | http://13.239.192.158:9093 |
+| **Node Exporter** | 9100 | ✅ Running | N/A | http://13.239.192.158:9100/metrics |
+| **Redis Exporter** | 9121 | ✅ Running | N/A | http://13.239.192.158:9121/metrics |
+| **Postgres Exporter** | 9187 | ✅ Running | N/A | http://13.239.192.158:9187/metrics |
 
 ### Disabled Services (Optional)
 - ❌ cAdvisor (port 8080) - File system permission issues
@@ -30,6 +30,14 @@
 
 ### 1. Access Grafana
 
+**🔒 Secure HTTPS Access (Recommended)**:
+```
+URL: https://trendy.storydot.kr/monitoring/grafana/
+Username: admin
+Password: admin123
+```
+
+**Alternative Direct Access**:
 ```
 URL: http://13.239.192.158:3002
 Username: admin
@@ -532,6 +540,11 @@ sudo docker compose restart prometheus
 ### 3. Access Dashboards
 
 **Grafana Dashboards** (Auto-loaded):
+- **Trading Overview**: https://trendy.storydot.kr/monitoring/grafana/d/trading-overview
+- **System Health**: https://trendy.storydot.kr/monitoring/grafana/d/system-health
+- **User Activity**: https://trendy.storydot.kr/monitoring/grafana/d/user-activity
+
+**Alternative Direct URLs**:
 - **Trading Overview**: http://13.239.192.158:3002/d/trading-overview
 - **System Health**: http://13.239.192.158:3002/d/system-health
 - **User Activity**: http://13.239.192.158:3002/d/user-activity
@@ -556,14 +569,14 @@ sudo docker compose restart prometheus
 
 ### Optional Enhancements
 
-1. **Enable HTTPS**
-   - Set up Nginx reverse proxy
-   - Obtain SSL certificate (Let's Encrypt)
-   - Configure secure access
+1. **✅ HTTPS Enabled**
+   - ✅ Nginx reverse proxy configured
+   - ✅ SSL certificate from Let's Encrypt (existing trendy.storydot.kr certificate)
+   - ✅ Secure access via https://trendy.storydot.kr/monitoring/*
 
 2. **Add More Exporters**
-   - MySQL Exporter (if using MySQL)
    - Nginx Exporter (for web server metrics)
+   - MySQL Exporter (if using MySQL)
    - Custom application exporters
 
 3. **Advanced Dashboards**
@@ -627,16 +640,20 @@ curl -u admin:admin123 http://13.239.192.158:3002/api/dashboards/home
 - ✅ System Health (CPU, memory, disk, network, database)
 - ✅ User Activity (active users, trades, performance)
 
+**Completed Enhancements**:
+- ✅ HTTPS configuration with Let's Encrypt (Nginx reverse proxy)
+- ✅ Custom alert thresholds adjusted for production monitoring
+- ✅ Alert notification channel examples (Slack, Telegram, Email)
+
 **Optional Enhancements**:
-- ⚙️ Alert notification channels (Slack, Telegram, Email) - Configuration guide provided
-- ⚙️ HTTPS configuration with Let's Encrypt
-- ⚙️ Custom alert thresholds tuning
+- ⚙️ Configure alert notifications (example configurations provided)
 - ⚙️ Additional exporters (Nginx, MySQL, custom)
+- ⚙️ Advanced monitoring dashboards
 
 **Ready to Use**:
-- ✅ Access Grafana dashboards: http://13.239.192.158:3002
-- ✅ Query Prometheus: http://13.239.192.158:9090
-- ✅ View alerts: http://13.239.192.158:9093
+- ✅ Access Grafana dashboards (HTTPS): https://trendy.storydot.kr/monitoring/grafana/
+- ✅ Query Prometheus (HTTPS): https://trendy.storydot.kr/monitoring/prometheus/
+- ✅ View alerts (HTTPS): https://trendy.storydot.kr/monitoring/alertmanager/
 - ✅ Backend metrics: http://13.239.192.158:8001/metrics
 - ✅ All services running with auto-restart enabled
 
