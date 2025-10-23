@@ -19,23 +19,48 @@ app = FastAPI(
 )
 
 # Prometheus metrics instrumentation
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
 from fastapi import Response
 
-# Custom metrics for trading system
-orders_total = Counter('orders_total', 'Total number of orders', ['exchange', 'action', 'status'])
-order_failures_total = Counter('order_failures_total', 'Total number of failed orders', ['exchange', 'reason'])
-trades_total = Counter('trades_total', 'Total number of completed trades', ['exchange', 'symbol'])
-trading_volume_usd = Counter('trading_volume_usd', 'Total trading volume in USD', ['exchange', 'symbol'])
+# Custom metrics for trading system (with safe registration)
+try:
+    orders_total = Counter('orders_total', 'Total number of orders', ['exchange', 'action', 'status'])
+    order_failures_total = Counter('order_failures_total', 'Total number of failed orders', ['exchange', 'reason'])
+    trades_total = Counter('trades_total', 'Total number of completed trades', ['exchange', 'symbol'])
+    trading_volume_usd = Counter('trading_volume_usd', 'Total trading volume in USD', ['exchange', 'symbol'])
 
-exchange_api_up = Gauge('exchange_api_up', 'Exchange API availability', ['exchange'])
-websocket_connected = Gauge('websocket_connected', 'WebSocket connection status', ['exchange'])
-active_positions = Gauge('active_positions', 'Number of active positions', ['exchange', 'symbol'])
-portfolio_value_usd = Gauge('portfolio_value_usd', 'Total portfolio value in USD', ['user_id'])
-portfolio_drawdown_percent = Gauge('portfolio_drawdown_percent', 'Portfolio drawdown percentage', ['user_id'])
+    exchange_api_up = Gauge('exchange_api_up', 'Exchange API availability', ['exchange'])
+    websocket_connected = Gauge('websocket_connected', 'WebSocket connection status', ['exchange'])
+    active_positions = Gauge('active_positions', 'Number of active positions', ['exchange', 'symbol'])
+    portfolio_value_usd = Gauge('portfolio_value_usd', 'Total portfolio value in USD', ['user_id'])
+    portfolio_drawdown_percent = Gauge('portfolio_drawdown_percent', 'Portfolio drawdown percentage', ['user_id'])
 
-http_request_duration_seconds = Histogram('http_request_duration_seconds', 'HTTP request latency',
-                                           ['method', 'endpoint', 'status'])
+    http_request_duration_seconds = Histogram('http_request_duration_seconds', 'HTTP request latency',
+                                               ['method', 'endpoint', 'status'])
+except ValueError:
+    # Metrics already registered (hot reload scenario) - retrieve existing collectors
+    for collector in list(REGISTRY._collector_to_names.keys()):
+        if hasattr(collector, '_name'):
+            if collector._name == 'orders_total':
+                orders_total = collector
+            elif collector._name == 'order_failures_total':
+                order_failures_total = collector
+            elif collector._name == 'trades_total':
+                trades_total = collector
+            elif collector._name == 'trading_volume_usd':
+                trading_volume_usd = collector
+            elif collector._name == 'exchange_api_up':
+                exchange_api_up = collector
+            elif collector._name == 'websocket_connected':
+                websocket_connected = collector
+            elif collector._name == 'active_positions':
+                active_positions = collector
+            elif collector._name == 'portfolio_value_usd':
+                portfolio_value_usd = collector
+            elif collector._name == 'portfolio_drawdown_percent':
+                portfolio_drawdown_percent = collector
+            elif collector._name == 'http_request_duration_seconds':
+                http_request_duration_seconds = collector
 
 # Metrics endpoint
 @app.get("/metrics")
