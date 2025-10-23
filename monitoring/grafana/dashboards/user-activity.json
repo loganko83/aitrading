@@ -1,257 +1,161 @@
 {
-  "dashboard": {
-    "title": "User Activity & Business Metrics",
-    "tags": ["users", "business", "activity"],
-    "timezone": "browser",
-    "schemaVersion": 38,
-    "version": 1,
-    "refresh": "1m",
-    "panels": [
-      {
-        "id": 1,
-        "title": "Active Users (24h)",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
-        "targets": [
-          {
-            "expr": "count(count by (user_id) (rate(orders_total[24h]) > 0))",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "decimals": 0,
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"value": 0, "color": "red"},
-                {"value": 10, "color": "yellow"},
-                {"value": 50, "color": "green"}
-              ]
-            }
-          }
+  "title": "User Activity",
+  "uid": "user-activity",
+  "tags": [
+    "user",
+    "activity"
+  ],
+  "editable": true,
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "title": "Active Users",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "count(count by (user_id) (portfolio_value_usd))"
         }
+      ]
+    },
+    {
+      "title": "Total Trades (24h)",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 0
       },
-      {
-        "id": 2,
-        "title": "New User Registrations",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
-        "targets": [
-          {
-            "expr": "increase(users_registered_total[1h])",
-            "refId": "A",
-            "legendFormat": "Registrations/hour"
-          }
-        ],
-        "yaxes": [
-          {"label": "Users", "format": "short"},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 3,
-        "title": "API Key Connections",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
-        "targets": [
-          {
-            "expr": "count(api_key_active == 1)",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "decimals": 0
-          }
+      "targets": [
+        {
+          "expr": "sum(increase(trades_total[24h]))"
         }
+      ]
+    },
+    {
+      "title": "Trading Volume (24h)",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 0
       },
-      {
-        "id": 4,
-        "title": "Strategies Deployed",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
-        "targets": [
-          {
-            "expr": "count(strategy_active == 1)",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "decimals": 0
-          }
+      "targets": [
+        {
+          "expr": "sum(increase(trading_volume_usd[24h]))"
         }
-      },
-      {
-        "id": 5,
-        "title": "Orders Per User",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
-        "targets": [
-          {
-            "expr": "sum by (user_id) (rate(orders_total[1h])) * 3600",
-            "refId": "A",
-            "legendFormat": "User {{user_id}}"
-          }
-        ],
-        "yaxes": [
-          {"label": "Orders/hour", "format": "short"},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 6,
-        "title": "Total Trading Volume by User",
-        "type": "bar",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
-        "targets": [
-          {
-            "expr": "topk(10, sum by (user_id) (trading_volume_usd))",
-            "refId": "A",
-            "legendFormat": "User {{user_id}}"
-          }
-        ],
-        "options": {
-          "orientation": "horizontal"
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
         }
-      },
-      {
-        "id": 7,
-        "title": "User Win Rate %",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
-        "targets": [
-          {
-            "expr": "(sum by (user_id) (rate(profitable_trades_total[1h])) / sum by (user_id) (rate(trades_total[1h]))) * 100",
-            "refId": "A",
-            "legendFormat": "User {{user_id}}"
-          }
-        ],
-        "yaxes": [
-          {"label": "Win Rate %", "format": "percent", "min": 0, "max": 100},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 8,
-        "title": "Session Duration",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
-        "targets": [
-          {
-            "expr": "avg by (user_id) (session_duration_seconds)",
-            "refId": "A",
-            "legendFormat": "User {{user_id}}"
-          }
-        ],
-        "yaxes": [
-          {"label": "Duration (s)", "format": "s"},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 9,
-        "title": "Popular Strategies",
-        "type": "piechart",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
-        "targets": [
-          {
-            "expr": "sum by (strategy_name) (strategy_deployments_total)",
-            "refId": "A",
-            "legendFormat": "{{strategy_name}}"
-          }
-        ]
-      },
-      {
-        "id": 10,
-        "title": "Exchange Usage Distribution",
-        "type": "piechart",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
-        "targets": [
-          {
-            "expr": "sum by (exchange) (rate(orders_total[1h]))",
-            "refId": "A",
-            "legendFormat": "{{exchange}}"
-          }
-        ]
-      },
-      {
-        "id": 11,
-        "title": "User Growth Trend",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
-        "targets": [
-          {
-            "expr": "sum(users_registered_total)",
-            "refId": "A",
-            "legendFormat": "Total Users"
-          },
-          {
-            "expr": "sum(increase(users_registered_total[7d]))",
-            "refId": "B",
-            "legendFormat": "Weekly Growth"
-          }
-        ],
-        "yaxes": [
-          {"label": "Users", "format": "short"},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 12,
-        "title": "Average Portfolio Value",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
-        "targets": [
-          {
-            "expr": "avg(portfolio_value_usd)",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "currencyUSD",
-            "decimals": 2
-          }
-        }
-      },
-      {
-        "id": 13,
-        "title": "Total Platform PnL",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36},
-        "targets": [
-          {
-            "expr": "sum(portfolio_pnl_usd)",
-            "refId": "A",
-            "legendFormat": "Total PnL"
-          }
-        ],
-        "yaxes": [
-          {"label": "PnL USD", "format": "currencyUSD"},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 14,
-        "title": "Feature Usage Heatmap",
-        "type": "heatmap",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36},
-        "targets": [
-          {
-            "expr": "sum by (feature) (rate(feature_usage_total[1h]))",
-            "refId": "A",
-            "legendFormat": "{{feature}}"
-          }
-        ]
       }
-    ]
-  }
+    },
+    {
+      "title": "Average Win Rate",
+      "type": "gauge",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(increase(orders_total{status=\"success\"}[24h])) / sum(increase(orders_total[24h]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "title": "Portfolio Values by User",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "portfolio_value_usd",
+          "legendFormat": "User {{user_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      }
+    },
+    {
+      "title": "Active Positions by Exchange",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "active_positions",
+          "legendFormat": "{{exchange}} - {{symbol}}"
+        }
+      ]
+    },
+    {
+      "title": "API Key Usage",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "sum by (exchange) (increase(orders_total[24h]))",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "User Performance Metrics",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "portfolio_value_usd",
+          "format": "table"
+        },
+        {
+          "expr": "portfolio_drawdown_percent",
+          "format": "table"
+        }
+      ]
+    }
+  ]
 }

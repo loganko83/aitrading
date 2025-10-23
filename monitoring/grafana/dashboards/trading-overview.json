@@ -1,285 +1,128 @@
 {
-  "dashboard": {
-    "title": "Trading System Overview",
-    "tags": ["trading", "overview"],
-    "timezone": "browser",
-    "schemaVersion": 38,
-    "version": 1,
-    "refresh": "10s",
-    "panels": [
-      {
-        "id": 1,
-        "title": "System Health",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
-        "targets": [
-          {
-            "expr": "up{job=\"trading-backend\"}",
-            "refId": "A",
-            "legendFormat": "Backend"
-          },
-          {
-            "expr": "up{job=\"trading-frontend\"}",
-            "refId": "B",
-            "legendFormat": "Frontend"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"value": 0, "color": "red"},
-                {"value": 1, "color": "green"}
-              ]
-            },
-            "mappings": [
-              {"type": "value", "value": 0, "text": "Down"},
-              {"type": "value", "value": 1, "text": "Up"}
-            ]
-          }
+  "title": "Trading Overview",
+  "uid": "trading-overview",
+  "tags": [
+    "trading",
+    "overview"
+  ],
+  "editable": true,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "title": "Total Orders (1h)",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(orders_total[1h]))"
         }
+      ]
+    },
+    {
+      "title": "Order Success Rate",
+      "type": "gauge",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 0
       },
-      {
-        "id": 2,
-        "title": "Orders Per Minute",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
-        "targets": [
-          {
-            "expr": "rate(orders_total[1m]) * 60",
-            "refId": "A",
-            "legendFormat": "{{exchange}} - {{action}}"
-          }
-        ],
-        "yaxes": [
-          {"label": "Orders/min", "format": "short"},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 3,
-        "title": "Order Success Rate",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
-        "targets": [
-          {
-            "expr": "(sum(rate(orders_total{status=\"success\"}[5m])) / sum(rate(orders_total[5m]))) * 100",
-            "refId": "A",
-            "legendFormat": "Success Rate %"
-          }
-        ],
-        "yaxes": [
-          {"label": "Success %", "format": "percent", "min": 0, "max": 100},
-          {"show": false}
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"value": 0, "color": "red"},
-                {"value": 90, "color": "yellow"},
-                {"value": 95, "color": "green"}
-              ]
-            }
-          }
+      "targets": [
+        {
+          "expr": "100 * sum(increase(orders_total{status=\"success\"}[1h])) / sum(increase(orders_total[1h]))"
         }
-      },
-      {
-        "id": 4,
-        "title": "Trading Volume (USD)",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
-        "targets": [
-          {
-            "expr": "sum(trading_volume_usd)",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "currencyUSD",
-            "decimals": 2
-          }
-        }
-      },
-      {
-        "id": 5,
-        "title": "Active Positions",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
-        "targets": [
-          {
-            "expr": "sum(active_positions)",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "unit": "short",
-            "decimals": 0
-          }
-        }
-      },
-      {
-        "id": 6,
-        "title": "Portfolio Value",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
-        "targets": [
-          {
-            "expr": "sum(portfolio_value_usd) by (user_id)",
-            "refId": "A",
-            "legendFormat": "User {{user_id}}"
-          }
-        ],
-        "yaxes": [
-          {"label": "Portfolio USD", "format": "currencyUSD"},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 7,
-        "title": "Max Drawdown %",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
-        "targets": [
-          {
-            "expr": "max(portfolio_drawdown_percent) by (user_id)",
-            "refId": "A",
-            "legendFormat": "User {{user_id}}"
-          }
-        ],
-        "yaxes": [
-          {"label": "Drawdown %", "format": "percent"},
-          {"show": false}
-        ],
-        "alert": {
-          "conditions": [
-            {
-              "evaluator": {"params": [15], "type": "gt"},
-              "operator": {"type": "and"},
-              "query": {"params": ["A", "5m", "now"]},
-              "reducer": {"params": [], "type": "avg"},
-              "type": "query"
-            }
-          ],
-          "executionErrorState": "alerting",
-          "frequency": "1m",
-          "handler": 1,
-          "name": "High Drawdown Alert",
-          "noDataState": "no_data",
-          "notifications": []
-        }
-      },
-      {
-        "id": 8,
-        "title": "API Response Time (p95)",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
-            "refId": "A",
-            "legendFormat": "{{method}} {{endpoint}}"
-          }
-        ],
-        "yaxes": [
-          {"label": "Response Time (s)", "format": "s"},
-          {"show": false}
-        ]
-      },
-      {
-        "id": 9,
-        "title": "Exchange API Status",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
-        "targets": [
-          {
-            "expr": "exchange_api_up",
-            "refId": "A",
-            "legendFormat": "{{exchange}}"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"value": 0, "color": "red"},
-                {"value": 1, "color": "green"}
-              ]
-            },
-            "mappings": [
-              {"type": "value", "value": 0, "text": "Down"},
-              {"type": "value", "value": 1, "text": "Up"}
-            ]
-          }
-        }
-      },
-      {
-        "id": 10,
-        "title": "WebSocket Connections",
-        "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 4},
-        "targets": [
-          {
-            "expr": "websocket_connected",
-            "refId": "A",
-            "legendFormat": "{{exchange}}"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {"value": 0, "color": "red"},
-                {"value": 1, "color": "green"}
-              ]
-            },
-            "mappings": [
-              {"type": "value", "value": 0, "text": "Disconnected"},
-              {"type": "value", "value": 1, "text": "Connected"}
-            ]
-          }
-        }
-      },
-      {
-        "id": 11,
-        "title": "Error Rate",
-        "type": "graph",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
-        "targets": [
-          {
-            "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) * 100",
-            "refId": "A",
-            "legendFormat": "{{method}} {{endpoint}}"
-          }
-        ],
-        "yaxes": [
-          {"label": "Error Rate %", "format": "percent"},
-          {"show": false}
-        ],
-        "alert": {
-          "conditions": [
-            {
-              "evaluator": {"params": [5], "type": "gt"},
-              "operator": {"type": "and"},
-              "query": {"params": ["A", "5m", "now"]},
-              "reducer": {"params": [], "type": "avg"},
-              "type": "query"
-            }
-          ],
-          "executionErrorState": "alerting",
-          "frequency": "1m",
-          "handler": 1,
-          "name": "High Error Rate Alert",
-          "noDataState": "no_data",
-          "notifications": []
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         }
       }
-    ]
-  }
+    },
+    {
+      "title": "Orders per Minute",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "rate(orders_total[5m])",
+          "legendFormat": "{{exchange}} - {{action}}"
+        }
+      ]
+    },
+    {
+      "title": "Exchange API Status",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "exchange_api_up",
+          "legendFormat": "{{exchange}}"
+        }
+      ]
+    },
+    {
+      "title": "Portfolio Value (USD)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 6,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "portfolio_value_usd",
+          "legendFormat": "User {{user_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      }
+    },
+    {
+      "title": "Portfolio Drawdown",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "portfolio_drawdown_percent",
+          "legendFormat": "User {{user_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "max": 0
+        }
+      }
+    }
+  ]
 }
