@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Play, Pause, TrendingUp } from 'lucide-react';
 import { useTradingStore } from '@/lib/stores/tradingStore';
+import { fetchDashboardStats, fetchPositions } from '@/lib/api/trading';
 import type { Position } from '@/types';
 
 export default function DashboardPage() {
@@ -25,135 +26,47 @@ export default function DashboardPage() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Mock data for development
+  // Load real data from backend API
   useEffect(() => {
-    // Simulate loading dashboard data
-    const mockStats = {
-      total_equity: 10500.00,
-      available_balance: 7200.00,
-      margin_used: 3300.00,
-      total_pnl: 850.00,
-      total_pnl_pct: 8.82,
-      today_pnl: 125.50,
-      today_pnl_pct: 1.21,
-      open_positions: 3,
-      total_trades: 47,
-      win_rate: 68.5,
-      xp_points: 1250,
-      level: 8,
-      next_level_xp: 1500,
+    const loadDashboardData = async () => {
+      try {
+        // Fetch dashboard stats from API
+        const stats = await fetchDashboardStats();
+        setDashboardStats(stats);
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats:', error);
+        // Fall back to mock data if API fails
+        setDashboardStats({
+          total_equity: 10500.00,
+          available_balance: 7200.00,
+          margin_used: 3300.00,
+          total_pnl: 850.00,
+          total_pnl_pct: 8.82,
+          today_pnl: 125.50,
+          today_pnl_pct: 1.21,
+          open_positions: 3,
+          total_trades: 47,
+          win_rate: 68.5,
+          xp_points: 1250,
+          level: 8,
+          next_level_xp: 1500,
+        });
+      }
+
+      try {
+        // Fetch positions from API
+        const positionsData = await fetchPositions();
+        setPositions(positionsData);
+      } catch (error) {
+        console.error('Failed to fetch positions:', error);
+        // Keep empty positions array if API fails
+        setPositions([]);
+      }
     };
 
-    const mockPositions: Position[] = [
-      {
-        id: '1',
-        user_id: session?.user?.id || '',
-        symbol: 'BTC/USDT',
-        side: 'LONG',
-        quantity: 0.025,
-        entry_price: 42000,
-        current_price: 43500,
-        sl_price: 40500,
-        tp_price: 45000,
-        leverage: 5,
-        current_pnl: 37.50,
-        current_pnl_pct: 3.57,
-        status: 'OPEN',
-        opened_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-        closed_at: undefined,
-        ai_analysis: {
-          P_up_final: 0.75,
-          P_down_final: 0.25,
-          confidence: 0.85,
-          model_agreement: 0.82,
-          breakdown: {
-            ml: { prob: 0.78, conf: 0.88, weight: 0.30 },
-            gpt: { prob: 0.72, conf: 0.85, weight: 0.25 },
-            llama: { prob: 0.76, conf: 0.83, weight: 0.25 },
-            ta: { prob: 0.74, conf: 0.82, weight: 0.20 },
-          },
-          reasoning: {
-            ml: 'Strong bullish momentum indicators',
-            gpt: 'Positive market sentiment and news',
-            llama: 'Technical breakout pattern detected',
-            ta: 'RSI and MACD showing bullish divergence',
-          },
-        },
-      },
-      {
-        id: '2',
-        user_id: session?.user?.id || '',
-        symbol: 'ETH/USDT',
-        side: 'LONG',
-        quantity: 0.5,
-        entry_price: 2280,
-        current_price: 2350,
-        sl_price: 2200,
-        tp_price: 2450,
-        leverage: 5,
-        current_pnl: 35.00,
-        current_pnl_pct: 3.07,
-        status: 'OPEN',
-        opened_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-        closed_at: undefined,
-        ai_analysis: {
-          P_up_final: 0.68,
-          P_down_final: 0.32,
-          confidence: 0.78,
-          model_agreement: 0.75,
-          breakdown: {
-            ml: { prob: 0.70, conf: 0.80, weight: 0.30 },
-            gpt: { prob: 0.65, conf: 0.75, weight: 0.25 },
-            llama: { prob: 0.69, conf: 0.78, weight: 0.25 },
-            ta: { prob: 0.68, conf: 0.79, weight: 0.20 },
-          },
-          reasoning: {
-            ml: 'Moderate uptrend with volume support',
-            gpt: 'Ethereum ecosystem growth signals',
-            llama: 'Price consolidation near resistance',
-            ta: 'Moving averages in bullish alignment',
-          },
-        },
-      },
-      {
-        id: '3',
-        user_id: session?.user?.id || '',
-        symbol: 'SOL/USDT',
-        side: 'SHORT',
-        quantity: 5,
-        entry_price: 105,
-        current_price: 102,
-        sl_price: 108,
-        tp_price: 98,
-        leverage: 5,
-        current_pnl: 15.00,
-        current_pnl_pct: 2.86,
-        status: 'OPEN',
-        opened_at: new Date(Date.now() - 3600000).toISOString(),
-        closed_at: undefined,
-        ai_analysis: {
-          P_up_final: 0.35,
-          P_down_final: 0.65,
-          confidence: 0.82,
-          model_agreement: 0.80,
-          breakdown: {
-            ml: { prob: 0.32, conf: 0.85, weight: 0.30 },
-            gpt: { prob: 0.38, conf: 0.80, weight: 0.25 },
-            llama: { prob: 0.34, conf: 0.82, weight: 0.25 },
-            ta: { prob: 0.36, conf: 0.81, weight: 0.20 },
-          },
-          reasoning: {
-            ml: 'Bearish momentum with selling pressure',
-            gpt: 'Negative market sentiment for Solana',
-            llama: 'Technical breakdown below support',
-            ta: 'RSI oversold but trend still bearish',
-          },
-        },
-      },
-    ];
-
-    setDashboardStats(mockStats);
-    setPositions(mockPositions);
+    if (session) {
+      loadDashboardData();
+    }
   }, [session, setDashboardStats, setPositions]);
 
   const handleRefresh = async () => {

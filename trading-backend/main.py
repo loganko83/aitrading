@@ -18,6 +18,31 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Prometheus metrics instrumentation
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from fastapi import Response
+
+# Custom metrics for trading system
+orders_total = Counter('orders_total', 'Total number of orders', ['exchange', 'action', 'status'])
+order_failures_total = Counter('order_failures_total', 'Total number of failed orders', ['exchange', 'reason'])
+trades_total = Counter('trades_total', 'Total number of completed trades', ['exchange', 'symbol'])
+trading_volume_usd = Counter('trading_volume_usd', 'Total trading volume in USD', ['exchange', 'symbol'])
+
+exchange_api_up = Gauge('exchange_api_up', 'Exchange API availability', ['exchange'])
+websocket_connected = Gauge('websocket_connected', 'WebSocket connection status', ['exchange'])
+active_positions = Gauge('active_positions', 'Number of active positions', ['exchange', 'symbol'])
+portfolio_value_usd = Gauge('portfolio_value_usd', 'Total portfolio value in USD', ['user_id'])
+portfolio_drawdown_percent = Gauge('portfolio_drawdown_percent', 'Portfolio drawdown percentage', ['user_id'])
+
+http_request_duration_seconds = Histogram('http_request_duration_seconds', 'HTTP request latency',
+                                           ['method', 'endpoint', 'status'])
+
+# Metrics endpoint
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 # Register exception handlers
 from app.core.exceptions import register_exception_handlers
 register_exception_handlers(app)

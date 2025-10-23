@@ -1,0 +1,264 @@
+{
+  "dashboard": {
+    "title": "System Health & Infrastructure",
+    "tags": ["system", "infrastructure", "health"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "refId": "A",
+            "legendFormat": "{{instance}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "CPU %", "format": "percent", "min": 0, "max": 100},
+          {"show": false}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [80], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "High CPU Usage",
+          "noDataState": "no_data"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+            "refId": "A",
+            "legendFormat": "{{instance}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "Memory %", "format": "percent", "min": 0, "max": 100},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Disk Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "(1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100",
+            "refId": "A",
+            "legendFormat": "{{instance}} {{mountpoint}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "Disk %", "format": "percent", "min": 0, "max": 100},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Network Traffic",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_bytes_total[5m])",
+            "refId": "A",
+            "legendFormat": "RX {{instance}}"
+          },
+          {
+            "expr": "rate(node_network_transmit_bytes_total[5m])",
+            "refId": "B",
+            "legendFormat": "TX {{instance}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "Bytes/sec", "format": "Bps"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "PostgreSQL Connections",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "pg_stat_activity_count",
+            "refId": "A",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "expr": "pg_settings_max_connections",
+            "refId": "B",
+            "legendFormat": "Max Connections"
+          }
+        ],
+        "yaxes": [
+          {"label": "Connections", "format": "short"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "PostgreSQL Query Performance",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(pg_stat_database_tup_fetched[5m])",
+            "refId": "A",
+            "legendFormat": "Rows Fetched/s"
+          },
+          {
+            "expr": "rate(pg_stat_database_tup_returned[5m])",
+            "refId": "B",
+            "legendFormat": "Rows Returned/s"
+          }
+        ],
+        "yaxes": [
+          {"label": "Rows/sec", "format": "short"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Redis Cache Hit Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100",
+            "refId": "A",
+            "legendFormat": "Hit Rate %"
+          }
+        ],
+        "yaxes": [
+          {"label": "Hit Rate %", "format": "percent", "min": 0, "max": 100},
+          {"show": false}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [70], "type": "lt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "10m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "2m",
+          "handler": 1,
+          "name": "Low Cache Hit Rate",
+          "noDataState": "no_data"
+        }
+      },
+      {
+        "id": 8,
+        "title": "Redis Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes",
+            "refId": "A",
+            "legendFormat": "Used Memory"
+          },
+          {
+            "expr": "redis_memory_max_bytes",
+            "refId": "B",
+            "legendFormat": "Max Memory"
+          }
+        ],
+        "yaxes": [
+          {"label": "Bytes", "format": "bytes"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Container CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{name=~\"trading.*\"}[5m]) * 100",
+            "refId": "A",
+            "legendFormat": "{{name}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "CPU %", "format": "percent"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Container Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{name=~\"trading.*\"}",
+            "refId": "A",
+            "legendFormat": "{{name}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "Memory", "format": "bytes"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 11,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "refId": "A",
+            "legendFormat": "{{method}} {{status}}"
+          }
+        ],
+        "yaxes": [
+          {"label": "Requests/sec", "format": "reqps"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 12,
+        "title": "HTTP Status Codes",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "targets": [
+          {
+            "expr": "sum by (status) (rate(http_requests_total[5m]))",
+            "refId": "A",
+            "legendFormat": "{{status}}"
+          }
+        ]
+      }
+    ]
+  }
+}
