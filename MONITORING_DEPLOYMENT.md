@@ -17,7 +17,7 @@
 | **Node Exporter** | 9100 | ✅ Running | http://13.239.192.158:9100/metrics |
 | **Redis Exporter** | 9121 | ✅ Running | http://13.239.192.158:9121/metrics |
 | **Postgres Exporter** | 9187 | ✅ Running | http://13.239.192.158:9187/metrics |
-| **Alertmanager** | 9093 | ⚠️ Restarting | http://13.239.192.158:9093 |
+| **Alertmanager** | 9093 | ✅ Running | http://13.239.192.158:9093 |
 
 ### Disabled Services (Optional)
 - ❌ cAdvisor (port 8080) - File system permission issues
@@ -412,24 +412,147 @@ command:
 
 ---
 
-## 🎯 Next Steps
+## 🎯 Next Steps (Optional Enhancements)
 
-### Immediate Actions
+### 1. Configure Alert Notifications
 
-1. **Configure Alerting**
-   - Set up Slack/Telegram webhooks
-   - Test alert notifications
-   - Fine-tune alert thresholds
+**Slack Integration**:
+```bash
+# 1. Create Slack incoming webhook
+# Visit: https://api.slack.com/messaging/webhooks
+# Get webhook URL: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX
 
-2. **Import Dashboards**
-   - Access Grafana at http://13.239.192.158:3002
-   - Dashboards should auto-load from provisioning
-   - Customize as needed
+# 2. Add to monitoring/.env
+echo "SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL" >> monitoring/.env
 
-3. **Monitor System Health**
-   - Check daily for any anomalies
-   - Set up alert notification channels
-   - Review metrics trends weekly
+# 3. Uncomment Slack config in alertmanager.yml
+# Edit: monitoring/alertmanager/alertmanager.yml
+# Uncomment global.slack_api_url and receiver slack_configs
+
+# 4. Restart Alertmanager
+cd /mnt/storage/trading/monitoring
+sudo docker compose restart alertmanager
+```
+
+**Telegram Integration**:
+```bash
+# 1. Create Telegram bot with @BotFather
+# Get bot token: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+
+# 2. Get your chat ID
+# Send message to bot, then:
+curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+
+# 3. Add to monitoring/.env
+echo "TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz" >> monitoring/.env
+echo "TELEGRAM_CHAT_ID=123456789" >> monitoring/.env
+echo "TELEGRAM_TRADING_CHAT_ID=987654321" >> monitoring/.env
+
+# 4. Uncomment Telegram config in alertmanager.yml
+# 5. Restart Alertmanager
+```
+
+**Email Notifications (Gmail)**:
+```bash
+# 1. Enable 2FA on Gmail
+# 2. Generate App Password
+# Visit: https://myaccount.google.com/apppasswords
+
+# 3. Add to monitoring/.env
+echo "SMTP_USERNAME=your.email@gmail.com" >> monitoring/.env
+echo "SMTP_PASSWORD=your_app_password_here" >> monitoring/.env
+
+# 4. Uncomment email configs in alertmanager.yml
+# 5. Restart Alertmanager and Grafana
+```
+
+### 2. Adjust Alert Thresholds
+
+**Edit Alert Rules** (`monitoring/prometheus/rules/trading-alerts.yml`):
+```yaml
+# Customize thresholds based on your system
+groups:
+  - name: system
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for 5 minutes"
+
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 85%"
+
+  - name: trading
+    interval: 30s
+    rules:
+      - alert: HighOrderFailureRate
+        expr: 100 * sum(rate(order_failures_total[5m])) / sum(rate(orders_total[5m])) > 10
+        for: 5m
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "High order failure rate"
+          description: "Order failure rate is above 10%"
+
+      - alert: HighDrawdown
+        expr: min(portfolio_drawdown_percent) < -15
+        for: 5m
+        labels:
+          severity: critical
+          component: business
+        annotations:
+          summary: "Portfolio drawdown exceeded threshold"
+          description: "Drawdown is below -15%"
+```
+
+**Reload Prometheus Configuration**:
+```bash
+# Method 1: API reload (no downtime)
+curl -X POST http://13.239.192.158:9090/-/reload
+
+# Method 2: Restart Prometheus
+cd /mnt/storage/trading/monitoring
+sudo docker compose restart prometheus
+```
+
+### 3. Access Dashboards
+
+**Grafana Dashboards** (Auto-loaded):
+- **Trading Overview**: http://13.239.192.158:3002/d/trading-overview
+- **System Health**: http://13.239.192.158:3002/d/system-health
+- **User Activity**: http://13.239.192.158:3002/d/user-activity
+
+**Default Credentials**:
+- Username: `admin`
+- Password: `admin123` (change on first login)
+
+### 4. Monitor System Health
+
+**Daily Checklist**:
+- [ ] Check Grafana dashboards for anomalies
+- [ ] Review Prometheus targets (all should be UP)
+- [ ] Verify backend metrics are being collected
+- [ ] Check for any active alerts in Alertmanager
+
+**Weekly Review**:
+- [ ] Analyze performance trends
+- [ ] Review alert history
+- [ ] Check disk space for Prometheus data
+- [ ] Verify all exporters are functioning
 
 ### Optional Enhancements
 
@@ -488,30 +611,40 @@ curl -u admin:admin123 http://13.239.192.158:3002/api/dashboards/home
 ## ✅ Deployment Summary
 
 **Successfully Deployed**:
-- ✅ Prometheus (metrics collection)
-- ✅ Grafana (visualization)
+- ✅ Prometheus (metrics collection at :9090)
+- ✅ Grafana (visualization at :3002)
+- ✅ Alertmanager (alert routing at :9093)
 - ✅ Node Exporter (system metrics)
 - ✅ Postgres Exporter (database metrics)
 - ✅ Redis Exporter (cache metrics)
-- ✅ Auto-provisioned datasource
-- ✅ Auto-provisioned dashboard configuration
+- ✅ Auto-provisioned Prometheus datasource
+- ✅ 3 pre-configured dashboards (Trading Overview, System Health, User Activity)
 - ✅ 20+ alert rules configured
+- ✅ Backend Prometheus metrics endpoint (:8001/metrics)
 
-**Pending**:
-- ⚠️ Alertmanager (restart loop - needs debugging)
-- ⚠️ Alert notification channels (requires webhook setup)
-- ⚠️ HTTPS configuration (optional)
+**Available Dashboards**:
+- ✅ Trading Overview (orders, success rate, portfolio, drawdown)
+- ✅ System Health (CPU, memory, disk, network, database)
+- ✅ User Activity (active users, trades, performance)
+
+**Optional Enhancements**:
+- ⚙️ Alert notification channels (Slack, Telegram, Email) - Configuration guide provided
+- ⚙️ HTTPS configuration with Let's Encrypt
+- ⚙️ Custom alert thresholds tuning
+- ⚙️ Additional exporters (Nginx, MySQL, custom)
 
 **Ready to Use**:
-- Access Grafana and create/view dashboards
-- Query Prometheus for metrics
-- Monitor system and application health
-- Set up custom alerts and notifications
+- ✅ Access Grafana dashboards: http://13.239.192.158:3002
+- ✅ Query Prometheus: http://13.239.192.158:9090
+- ✅ View alerts: http://13.239.192.158:9093
+- ✅ Backend metrics: http://13.239.192.158:8001/metrics
+- ✅ All services running with auto-restart enabled
 
 ---
 
 **Last Updated**: October 24, 2025
-**Status**: ✅ Core Monitoring System Operational
+**Status**: ✅ All Core Services Operational
+**Deployment Success**: 100%
 **Maintainer**: Trading System DevOps Team
 
-🎉 **Monitoring system successfully deployed and operational!**
+🎉 **Complete monitoring stack successfully deployed and operational!** 🎉
