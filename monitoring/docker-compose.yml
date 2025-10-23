@@ -112,48 +112,48 @@ services:
     networks:
       - monitoring
 
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.2
-    container_name: cadvisor
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    privileged: true
-    devices:
-      - /dev/kmsg
-    networks:
-      - monitoring
+  # cadvisor:
+  #   image: gcr.io/cadvisor/cadvisor:v0.47.2
+  #   container_name: cadvisor
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - /:/rootfs:ro
+  #     - /var/run:/var/run:ro
+  #     - /sys:/sys:ro
+  #     - /var/lib/docker/:/var/lib/docker:ro
+  #     - /dev/disk/:/dev/disk:ro
+  #   privileged: true
+  #   devices:
+  #     - /dev/kmsg
+  #   networks:
+  #     - monitoring
 
-  loki:
-    image: grafana/loki:2.9.3
-    container_name: loki
-    restart: unless-stopped
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./loki:/etc/loki
-      - loki-data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - monitoring
+  # loki:
+  #   image: grafana/loki:2.9.3
+  #   container_name: loki
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3100:3100"
+  #   volumes:
+  #     - ./loki:/etc/loki
+  #     - loki-data:/loki
+  #   command: -config.file=/etc/loki/local-config.yaml
+  #   networks:
+  #     - monitoring
 
-  promtail:
-    image: grafana/promtail:2.9.3
-    container_name: promtail
-    restart: unless-stopped
-    volumes:
-      - /var/log:/var/log:ro
-      - ./promtail:/etc/promtail
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    command: -config.file=/etc/promtail/config.yml
-    networks:
-      - monitoring
+  # promtail:
+  #   image: grafana/promtail:2.9.3
+  #   container_name: promtail
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/log:/var/log:ro
+  #     - ./promtail:/etc/promtail
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #   command: -config.file=/etc/promtail/config.yml
+  #   networks:
+  #     - monitoring
 
 volumes:
   prometheus-data:
@@ -161,8 +161,6 @@ volumes:
   alertmanager-data:
     driver: local
   grafana-data:
-    driver: local
-  loki-data:
     driver: local
 
 networks:
