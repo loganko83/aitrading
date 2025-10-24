@@ -16,8 +16,9 @@
 | **Grafana** | 3002 | ✅ Running | https://trendy.storydot.kr/monitoring/grafana/ | http://13.239.192.158:3002 |
 | **Alertmanager** | 9093 | ✅ Running | https://trendy.storydot.kr/monitoring/alertmanager/ | http://13.239.192.158:9093 |
 | **Node Exporter** | 9100 | ✅ Running | N/A | http://13.239.192.158:9100/metrics |
-| **Redis Exporter** | 9121 | ✅ Running | N/A | http://13.239.192.158:9121/metrics |
 | **Postgres Exporter** | 9187 | ✅ Running | N/A | http://13.239.192.158:9187/metrics |
+| **Redis Exporter** | 9121 | ✅ Running | N/A | http://13.239.192.158:9121/metrics |
+| **Nginx Exporter** | 9113 | ✅ Running | N/A | http://13.239.192.158:9113/metrics |
 
 ### Disabled Services (Optional)
 - ❌ cAdvisor (port 8080) - File system permission issues
@@ -129,6 +130,11 @@ scrape_configs:
   - job_name: 'redis-exporter'
     static_configs:
       - targets: ['redis-exporter:9121']  # Cache metrics
+
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['13.239.192.158:9113']  # Nginx web server metrics
+    scrape_interval: 30s
 ```
 
 ### Grafana Datasource
@@ -146,15 +152,17 @@ scrape_configs:
 **Critical Alerts**:
 - BackendDown (2m threshold)
 - HighErrorRate (>5%, 5m)
-- HighOrderFailureRate (>10%, 5m)
-- HighDrawdown (>15%, 5m)
+- HighOrderFailureRate (>5%, 5m) ⚡ *Adjusted for production*
+- HighDrawdown (>10%, 5m) ⚡ *Adjusted for production*
 - ExchangeAPIDown (3m)
+- HighDatabaseConnections (>50 connections) ⚡ *Adjusted for production*
 
 **Warning Alerts**:
-- HighMemoryUsage (>85%)
-- HighCPUUsage (>80%)
-- SlowAPIResponse (>500ms)
+- HighMemoryUsage (>80%) ⚡ *Adjusted for production*
+- HighCPUUsage (>75%) ⚡ *Adjusted for production*
+- SlowAPIResponse (>0.5s) ⚡ *Adjusted for production*
 - LowDiskSpace (<10%)
+- LowCacheHitRate (<80%) ⚡ *Adjusted for production*
 
 ---
 
@@ -358,6 +366,14 @@ http_request_duration_seconds{method="POST", endpoint="/api/v1/orders", status="
 - Hit/miss ratio
 - Operations per second
 - Key count
+
+### Nginx Metrics (Nginx Exporter)
+
+- Active connections
+- Total HTTP requests
+- Connection states (reading, writing, waiting)
+- Request rate
+- Connections accepted/handled
 
 ---
 
@@ -574,12 +590,16 @@ sudo docker compose restart prometheus
    - ✅ SSL certificate from Let's Encrypt (existing trendy.storydot.kr certificate)
    - ✅ Secure access via https://trendy.storydot.kr/monitoring/*
 
-2. **Add More Exporters**
-   - Nginx Exporter (for web server metrics)
+2. **✅ Nginx Exporter Deployed**
+   - ✅ Web server metrics monitoring (active connections, request rates, etc.)
+   - ✅ Integrated with Prometheus scraping
+   - ✅ Accessible at http://13.239.192.158:9113/metrics
+
+3. **Add More Exporters (Optional)**
    - MySQL Exporter (if using MySQL)
    - Custom application exporters
 
-3. **Advanced Dashboards**
+4. **Advanced Dashboards**
    - Business metrics dashboard
    - SLA/SLO tracking
    - Cost analysis
@@ -596,6 +616,7 @@ sudo docker compose restart prometheus
 - **Node Exporter**: https://github.com/prometheus/node_exporter
 - **Postgres Exporter**: https://github.com/prometheus-community/postgres_exporter
 - **Redis Exporter**: https://github.com/oliver006/redis_exporter
+- **Nginx Exporter**: https://github.com/nginxinc/nginx-prometheus-exporter
 
 ### Common Queries
 
@@ -630,9 +651,10 @@ curl -u admin:admin123 http://13.239.192.158:3002/api/dashboards/home
 - ✅ Node Exporter (system metrics)
 - ✅ Postgres Exporter (database metrics)
 - ✅ Redis Exporter (cache metrics)
+- ✅ Nginx Exporter (web server metrics)
 - ✅ Auto-provisioned Prometheus datasource
 - ✅ 3 pre-configured dashboards (Trading Overview, System Health, User Activity)
-- ✅ 20+ alert rules configured
+- ✅ 20+ alert rules configured and adjusted for production
 - ✅ Backend Prometheus metrics endpoint (:8001/metrics)
 
 **Available Dashboards**:
@@ -644,10 +666,11 @@ curl -u admin:admin123 http://13.239.192.158:3002/api/dashboards/home
 - ✅ HTTPS configuration with Let's Encrypt (Nginx reverse proxy)
 - ✅ Custom alert thresholds adjusted for production monitoring
 - ✅ Alert notification channel examples (Slack, Telegram, Email)
+- ✅ Nginx Exporter for web server metrics monitoring
 
 **Optional Enhancements**:
 - ⚙️ Configure alert notifications (example configurations provided)
-- ⚙️ Additional exporters (Nginx, MySQL, custom)
+- ⚙️ Additional exporters (MySQL, custom application exporters)
 - ⚙️ Advanced monitoring dashboards
 
 **Ready to Use**:
