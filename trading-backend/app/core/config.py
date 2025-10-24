@@ -1,10 +1,28 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List
 import os
 
 
+# Determine which .env file to load based on ENVIRONMENT variable
+_environment = os.getenv("ENVIRONMENT", "development")
+_env_file = f".env.{_environment}"
+
+# Fall back to .env if environment-specific file doesn't exist
+if not os.path.exists(_env_file):
+    _env_file = ".env"
+
+print(f"🔧 Loading configuration from: {_env_file}")
+
+
 class Settings(BaseSettings):
     """Application configuration settings with environment support"""
+
+    model_config = SettingsConfigDict(
+        env_file=_env_file,
+        env_file_encoding='utf-8',
+        case_sensitive=True,
+        extra='ignore'
+    )
 
     # Application
     APP_NAME: str = "TradingBot AI Backend"
@@ -125,40 +143,6 @@ class Settings(BaseSettings):
 
         if errors:
             raise ValueError(f"Production configuration errors: {', '.join(errors)}")
-
-    class Config:
-        # 환경변수 ENVIRONMENT에 따라 다른 .env 파일 로드
-        # 예: ENVIRONMENT=production이면 .env.production 로드
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
-
-        @classmethod
-        def customise_sources(
-            cls,
-            init_settings,
-            env_settings,
-            file_secret_settings,
-        ):
-            # 환경변수 ENVIRONMENT에 따라 다른 .env 파일 선택
-            environment = os.getenv("ENVIRONMENT", "development")
-            env_file = f".env.{environment}"
-
-            # .env.{environment} 파일이 있으면 사용, 없으면 기본 .env 사용
-            if os.path.exists(env_file):
-                print(f"Loading configuration from: {env_file}")
-                return (
-                    init_settings,
-                    env_settings,
-                    file_secret_settings,
-                )
-            else:
-                print(f"Environment file {env_file} not found, using .env")
-                return (
-                    init_settings,
-                    env_settings,
-                    file_secret_settings,
-                )
 
 
 def get_settings() -> Settings:

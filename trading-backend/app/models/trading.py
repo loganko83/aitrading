@@ -1,9 +1,9 @@
 """Trading-related models (Settings, Positions, Trades)"""
 
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, ARRAY, Text
+from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, ARRAY, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.database.base import Base
+from app.database.base import Base, is_sqlite
 
 
 class TradingSettings(Base):
@@ -13,7 +13,8 @@ class TradingSettings(Base):
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
     risk_tolerance = Column(String, default="medium")  # low, medium, high
-    selected_coins = Column(ARRAY(String), default=["BTC/USDT"])
+    # Use JSON for SQLite, ARRAY for PostgreSQL
+    selected_coins = Column(JSON if is_sqlite else ARRAY(String), default=["BTC/USDT"])
     leverage = Column(Integer, default=3)
     position_size_pct = Column(Float, default=0.10)  # 10%
     stop_loss_atr_multiplier = Column(Float, default=2.0)

@@ -3,7 +3,7 @@
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text, ARRAY, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.database.base import Base
+from app.database.base import Base, is_sqlite
 
 
 class Strategy(Base):
@@ -77,7 +77,8 @@ class StrategyConfig(Base):
 
     # Auto-trading settings
     auto_trade_enabled = Column(Boolean, default=False)
-    selected_symbols = Column(ARRAY(String), default=["BTCUSDT"])
+    # Use JSON for SQLite, ARRAY for PostgreSQL
+    selected_symbols = Column(JSON if is_sqlite else ARRAY(String), default=["BTCUSDT"])
 
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

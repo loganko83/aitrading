@@ -1,9 +1,9 @@
 """User and authentication models"""
 
-from sqlalchemy import Column, String, DateTime, Integer, Float, ARRAY, ForeignKey, Text, Boolean
+from sqlalchemy import Column, String, DateTime, Integer, Float, ARRAY, ForeignKey, Text, Boolean, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.database.base import Base
+from app.database.base import Base, is_sqlite
 
 
 class User(Base):
@@ -35,7 +35,8 @@ class User(Base):
     total_losses = Column(Integer, default=0)
     total_pnl = Column(Float, default=0.0)
     win_streak = Column(Integer, default=0)
-    badges = Column(ARRAY(String), default=[])
+    # Use JSON for SQLite, ARRAY for PostgreSQL
+    badges = Column(JSON if is_sqlite else ARRAY(String), default=[])
 
     # Relationships
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")

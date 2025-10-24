@@ -1,7 +1,7 @@
 """Alembic environment configuration for async SQLAlchemy"""
 
 from logging.config import fileConfig
-from sqlalchemy import pool
+from sqlalchemy import pool, engine_from_config
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
@@ -23,8 +23,19 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Detect database type
+is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+
 # Set sqlalchemy.url from app settings
-database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+if is_sqlite:
+    # SQLite: Use as-is (synchronous)
+    database_url = settings.DATABASE_URL
+    print("🗄️ Alembic: Using SQLite (synchronous migrations)")
+else:
+    # PostgreSQL: Convert to async driver
+    database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+    print("🗄️ Alembic: Using PostgreSQL (asynchronous migrations)")
+
 config.set_main_option("sqlalchemy.url", database_url)
 
 # add your model's MetaData object here
@@ -86,10 +97,36 @@ async def run_async_migrations() -> None:
     await connectable.dispose()
 
 
+def run_migrations_online_sync() -> None:
+    """Run migrations in 'online' mode (synchronous for SQLite)."""
+
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+    connectable.dispose()
+
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
 
-    asyncio.run(run_async_migrations())
+    if is_sqlite:
+        # SQLite: Use synchronous migrations
+        run_migrations_online_sync()
+    else:
+        # PostgreSQL: Use async migrations
+        asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():

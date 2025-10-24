@@ -7,7 +7,7 @@
 import asyncio
 import logging
 from datetime import datetime, time
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union
 
 from sqlalchemy import select
 
@@ -16,8 +16,9 @@ from app.services.telegram_service import TelegramService
 from app.services.binance_client import BinanceClient
 from app.services.okx_client import OKXClient
 from app.models.api_key import ApiKey
-from app.database.base import AsyncSessionLocal
+from app.database.base import AsyncSessionLocal, is_sqlite, SessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +97,13 @@ class RiskMonitor:
 
     async def monitor_all_accounts(self):
         """모든 활성 계정 모니터링"""
-        async with AsyncSessionLocal() as db:
+        if is_sqlite:
+            # SQLite: 동기 방식
+            db = SessionLocal()
             try:
                 # 모든 활성 API 키 조회
                 stmt = select(ApiKey).where(ApiKey.is_active == True)
-                result = await db.execute(stmt)
+                result = db.execute(stmt)
                 active_keys = result.scalars().all()
 
                 for api_key in active_keys:
@@ -111,10 +114,31 @@ class RiskMonitor:
 
             except Exception as e:
                 logger.error(f"Error in monitor_all_accounts: {e}")
-                await db.rollback()
+                db.rollback()
                 raise
+            finally:
+                db.close()
+        else:
+            # PostgreSQL: 비동기 방식
+            async with AsyncSessionLocal() as db:
+                try:
+                    # 모든 활성 API 키 조회
+                    stmt = select(ApiKey).where(ApiKey.is_active == True)
+                    result = await db.execute(stmt)
+                    active_keys = result.scalars().all()
 
-    async def monitor_account(self, api_key: ApiKey, db: AsyncSession):
+                    for api_key in active_keys:
+                        try:
+                            await self.monitor_account(api_key, db)
+                        except Exception as e:
+                            logger.error(f"Error monitoring account {api_key.id}: {e}")
+
+                except Exception as e:
+                    logger.error(f"Error in monitor_all_accounts: {e}")
+                    await db.rollback()
+                    raise
+
+    async def monitor_account(self, api_key: ApiKey, db: Union[Session, AsyncSession]):
         """개별 계정 모니터링"""
 
         # 거래소 클라이언트 생성
@@ -409,11 +433,12 @@ class RiskMonitor:
 
     async def send_daily_reports(self):
         """모든 계정에 일일 리포트 전송"""
-
-        async with AsyncSessionLocal() as db:
+        if is_sqlite:
+            # SQLite: 동기 방식
+            db = SessionLocal()
             try:
                 stmt = select(ApiKey).where(ApiKey.is_active == True)
-                result = await db.execute(stmt)
+                result = db.execute(stmt)
                 active_keys = result.scalars().all()
 
                 for api_key in active_keys:
@@ -424,10 +449,30 @@ class RiskMonitor:
 
             except Exception as e:
                 logger.error(f"Error in send_daily_reports: {e}")
-                await db.rollback()
+                db.rollback()
                 raise
+            finally:
+                db.close()
+        else:
+            # PostgreSQL: 비동기 방식
+            async with AsyncSessionLocal() as db:
+                try:
+                    stmt = select(ApiKey).where(ApiKey.is_active == True)
+                    result = await db.execute(stmt)
+                    active_keys = result.scalars().all()
 
-    async def send_account_daily_report(self, api_key: ApiKey, db: AsyncSession):
+                    for api_key in active_keys:
+                        try:
+                            await self.send_account_daily_report(api_key, db)
+                        except Exception as e:
+                            logger.error(f"Error sending daily report for {api_key.id}: {e}")
+
+                except Exception as e:
+                    logger.error(f"Error in send_daily_reports: {e}")
+                    await db.rollback()
+                    raise
+
+    async def send_account_daily_report(self, api_key: ApiKey, db: Union[Session, AsyncSession]):
         """개별 계정 일일 리포트"""
 
         # 거래소 클라이언트 생성
