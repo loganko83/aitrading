@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { apiPost } from '@/lib/utils/api-client';
+import { register as registerUser } from '@/lib/api/auth';
+import { signIn } from 'next-auth/react';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -44,23 +45,30 @@ export default function SignupPage() {
     setError('');
 
     try {
-      const response = await apiPost('/api/auth/signup', {
-        name: data.name,
+      // Register user with backend API
+      const result = await registerUser({
         email: data.email,
         password: data.password,
+        name: data.name,
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Signup failed');
+      if (!result.success) {
+        throw new Error(result.message || 'Registration failed');
       }
 
-      // Redirect to login or OTP setup page
-      if (result.requireOTP) {
-        router.push(`/verify-otp?userId=${result.userId}`);
-      } else {
+      // Automatically sign in the user after successful registration
+      const signInResult = await signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        // Registration succeeded but login failed - redirect to login page
         router.push('/login?signup=success');
+      } else {
+        // Both registration and login succeeded - redirect to dashboard
+        router.push('/dashboard');
       }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,6 +12,13 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Key,
   Eye,
   EyeOff,
@@ -20,147 +28,89 @@ import {
   AlertCircle,
   ExternalLink,
   Shield,
-  Wallet,
+  Power,
+  PowerOff,
 } from 'lucide-react';
-import { maskApiKey } from '@/lib/crypto';
+import {
+  registerAccount,
+  getAccountList,
+  deleteAccount,
+  toggleAccount,
+  type AccountListItem,
+} from '@/lib/api/accounts';
 
 const apiKeysSchema = z.object({
+  exchange: z.enum(['binance', 'okx'], {
+    required_error: 'Please select an exchange',
+  }),
   api_key: z
     .string()
-    .min(64, 'API key must be 64 characters')
-    .max(64, 'API key must be 64 characters')
-    .regex(/^[A-Za-z0-9]+$/, 'API key must be alphanumeric'),
+    .min(16, 'API key is too short')
+    .max(256, 'API key is too long'),
   api_secret: z
     .string()
-    .min(64, 'API secret must be 64 characters')
-    .max(64, 'API secret must be 64 characters')
-    .regex(/^[A-Za-z0-9]+$/, 'API secret must be alphanumeric'),
+    .min(16, 'API secret is too short')
+    .max(256, 'API secret is too long'),
+  passphrase: z.string().optional(),
+  testnet: z.boolean().default(true),
 });
 
 type ApiKeysFormData = z.infer<typeof apiKeysSchema>;
 
-interface AccountInfo {
-  totalWalletBalance: string;
-  availableBalance: string;
-  totalUnrealizedProfit: string;
-  canTrade: boolean;
-  canDeposit: boolean;
-  canWithdraw: boolean;
-}
-
 export default function ApiKeysPage() {
-  const [hasKeys, setHasKeys] = useState(false);
+  const { data: session } = useSession();
+  const [accounts, setAccounts] = useState<AccountListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
+  const [showPassphrase, setShowPassphrase] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [storedApiKey, setStoredApiKey] = useState('');
-  const [storedApiSecret, setStoredApiSecret] = useState('');
-  const [lastVerified, setLastVerified] = useState<string | null>(null);
-  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [selectedExchange, setSelectedExchange] = useState<'binance' | 'okx'>('binance');
+  const [isTestnet, setIsTestnet] = useState(true);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
+    watch,
   } = useForm<ApiKeysFormData>({
     resolver: zodResolver(apiKeysSchema),
+    defaultValues: {
+      exchange: 'binance',
+      testnet: true,
+    },
   });
 
-  // Load existing API keys on mount
+  const watchExchange = watch('exchange');
+
+  // Load existing accounts on mount
   useEffect(() => {
-    loadApiKeys();
-  }, []);
+    if (session?.user?.accessToken) {
+      loadAccounts();
+    }
+  }, [session]);
 
-  const loadApiKeys = async () => {
+  const loadAccounts = async () => {
+    if (!session?.user?.accessToken) {
+      setError('Please log in to manage API keys');
+      return;
+    }
+
     try {
-      const response = await fetch('/api/keys');
-      const data = await response.json();
-
-      if (data.hasKeys) {
-        setHasKeys(true);
-        setStoredApiKey(data.api_key);
-        setStoredApiSecret(data.api_secret);
-        setLastVerified(data.last_verified);
-      }
-    } catch (err) {
-      console.error('Failed to load API keys:', err);
+      const data = await getAccountList(session.user.accessToken);
+      setAccounts(data.accounts);
+    } catch (err: any) {
+      console.error('Failed to load accounts:', err);
+      setError(err.message || 'Failed to load accounts');
     }
   };
 
   const onSubmit = async (data: ApiKeysFormData) => {
-    setIsLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      // Save API keys
-      const saveResponse = await fetch('/api/keys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      const saveResult = await saveResponse.json();
-
-      if (!saveResponse.ok) {
-        throw new Error(saveResult.error || 'Failed to save API keys');
-      }
-
-      setSuccess('API keys saved successfully!');
-      setHasKeys(true);
-      setStoredApiKey(data.api_key);
-      setStoredApiSecret(data.api_secret);
-
-      // Reset form to show masked values
-      reset();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyKeys = async () => {
-    setIsVerifying(true);
-    setError('');
-    setSuccess('');
-    setAccountInfo(null);
-
-    try {
-      const response = await fetch('/api/keys/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: storedApiKey,
-          api_secret: storedApiSecret,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Verification failed');
-      }
-
-      setSuccess('API keys verified successfully! Connected to Binance Futures.');
-      setLastVerified(new Date().toISOString());
-      setAccountInfo(result.accountInfo);
-
-      // Reload to update verification status
-      await loadApiKeys();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleDeleteKeys = async () => {
-    if (!confirm('Are you sure you want to delete your API keys? This action cannot be undone.')) {
+    if (!session?.user?.accessToken) {
+      setError('Please log in to add API keys');
       return;
     }
 
@@ -169,28 +119,74 @@ export default function ApiKeysPage() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/keys', {
-        method: 'DELETE',
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to delete API keys');
+      // OKX requires passphrase
+      if (data.exchange === 'okx' && !data.passphrase) {
+        throw new Error('Passphrase is required for OKX');
       }
 
-      setSuccess('API keys deleted successfully');
-      setHasKeys(false);
-      setStoredApiKey('');
-      setStoredApiSecret('');
-      setLastVerified(null);
-      setAccountInfo(null);
+      await registerAccount(
+        {
+          exchange: data.exchange,
+          api_key: data.api_key,
+          api_secret: data.api_secret,
+          passphrase: data.passphrase,
+          testnet: data.testnet,
+        },
+        session.user.accessToken
+      );
+
+      setSuccess(`${data.exchange.toUpperCase()} API keys registered successfully!`);
+
+      // Reload accounts list
+      await loadAccounts();
+
+      // Reset form
       reset();
+      setShowApiKey(false);
+      setShowApiSecret(false);
+      setShowPassphrase(false);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Failed to register API keys');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleToggleAccount = async (accountId: string) => {
+    if (!session?.user?.accessToken) return;
+
+    try {
+      await toggleAccount(accountId, session.user.accessToken);
+      setSuccess('Account status updated');
+      await loadAccounts();
+    } catch (err: any) {
+      setError(err.message || 'Failed to toggle account');
+    }
+  };
+
+  const handleDeleteAccount = async (accountId: string, exchange: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete this ${exchange.toUpperCase()} account? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    if (!session?.user?.accessToken) return;
+
+    try {
+      await deleteAccount(accountId, session.user.accessToken);
+      setSuccess('Account deleted successfully');
+      await loadAccounts();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete account');
+    }
+  };
+
+  const maskKey = (key: string) => {
+    if (key.length <= 8) return '****';
+    return key.substring(0, 4) + '****' + key.substring(key.length - 4);
   };
 
   return (
@@ -199,7 +195,7 @@ export default function ApiKeysPage() {
       <div>
         <h2 className="text-3xl font-bold tracking-tight">API Key Management</h2>
         <p className="text-muted-foreground">
-          Connect your Binance Futures account to enable automated trading
+          Connect your exchange accounts to enable automated trading
         </p>
       </div>
 
@@ -207,111 +203,194 @@ export default function ApiKeysPage() {
       <Alert>
         <Shield className="h-4 w-4" />
         <AlertDescription>
-          <strong>Security Information:</strong> Your API keys are encrypted using AES-256-GCM before storage.
-          We recommend creating a new API key specifically for this bot with only Futures trading permissions enabled.
+          <strong>Security Information:</strong> Your API keys are encrypted using AES-256 before storage.
+          Create dedicated API keys for this bot with only Futures trading permissions enabled.
         </AlertDescription>
       </Alert>
+
+      {/* Registered Accounts */}
+      {accounts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Registered Accounts</CardTitle>
+            <CardDescription>
+              Manage your connected exchange accounts
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {accounts.map((account) => (
+                <div
+                  key={account.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="flex flex-col">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold">
+                          {account.exchange.toUpperCase()}
+                        </span>
+                        <Badge variant={account.testnet ? 'secondary' : 'default'}>
+                          {account.testnet ? 'Testnet' : 'Mainnet'}
+                        </Badge>
+                        <Badge
+                          variant={account.is_active ? 'default' : 'outline'}
+                          className={account.is_active ? 'bg-green-600' : ''}
+                        >
+                          {account.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        Registered: {new Date(account.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleToggleAccount(account.id)}
+                    >
+                      {account.is_active ? (
+                        <>
+                          <PowerOff className="h-4 w-4 mr-1" />
+                          Disable
+                        </>
+                      ) : (
+                        <>
+                          <Power className="h-4 w-4 mr-1" />
+                          Enable
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteAccount(account.id, account.exchange)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Setup Instructions */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Key className="h-5 w-5" />
-            <span>How to Get Your Binance API Keys</span>
+            <span>How to Get Your API Keys</span>
           </CardTitle>
           <CardDescription>
-            Follow these steps to create API keys on Binance
+            Follow these steps to create API keys on your exchange
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ol className="list-decimal list-inside space-y-3 text-sm">
-            <li>
-              Log in to your Binance account and navigate to{' '}
-              <a
-                href="https://www.binance.com/en/my/settings/api-management"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline inline-flex items-center"
-              >
-                API Management
-                <ExternalLink className="ml-1 h-3 w-3" />
-              </a>
-            </li>
-            <li>Click "Create API" and choose "System generated"</li>
-            <li>Label your API key (e.g., "TradingBot AI")</li>
-            <li>Complete security verification (2FA/Email)</li>
-            <li>
-              <strong>Important:</strong> Enable only "Enable Futures" permission
-            </li>
-            <li>Save your API Key and Secret Key securely</li>
-            <li>
-              <strong>Recommended:</strong> Add IP whitelist restrictions for additional security
-            </li>
-          </ol>
+          {/* Binance Instructions */}
+          <div>
+            <h3 className="font-semibold mb-2">Binance</h3>
+            <ol className="list-decimal list-inside space-y-2 text-sm">
+              <li>
+                Log in to{' '}
+                <a
+                  href="https://www.binance.com/en/my/settings/api-management"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline inline-flex items-center"
+                >
+                  Binance API Management
+                  <ExternalLink className="ml-1 h-3 w-3" />
+                </a>
+              </li>
+              <li>Create API and choose "System generated"</li>
+              <li>Enable only "Enable Futures" permission</li>
+              <li>Save your API Key and Secret Key</li>
+            </ol>
+          </div>
+
+          {/* OKX Instructions */}
+          <div>
+            <h3 className="font-semibold mb-2">OKX</h3>
+            <ol className="list-decimal list-inside space-y-2 text-sm">
+              <li>
+                Log in to{' '}
+                <a
+                  href="https://www.okx.com/account/my-api"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline inline-flex items-center"
+                >
+                  OKX API Management
+                  <ExternalLink className="ml-1 h-3 w-3" />
+                </a>
+              </li>
+              <li>Create API Key and set permissions to "Trade" only</li>
+              <li>Save API Key, Secret Key, and Passphrase</li>
+            </ol>
+          </div>
 
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              <strong>Never share your API Secret Key.</strong> Our system encrypts it immediately upon submission.
-              We cannot recover lost API keys - you'll need to create new ones on Binance.
+              <strong>Never share your API Secret Key or Passphrase.</strong> Our system encrypts them
+              immediately. We cannot recover lost keys - you'll need to create new ones.
             </AlertDescription>
           </Alert>
         </CardContent>
       </Card>
 
-      {/* Account Info (if verified) */}
-      {accountInfo && (
-        <Card className="border-green-600 bg-green-50 dark:bg-green-950">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-green-900 dark:text-green-100">
-              <CheckCircle2 className="h-5 w-5" />
-              <span>Connected to Binance Futures</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-green-700 dark:text-green-300">Total Balance</p>
-                <p className="text-lg font-bold text-green-900 dark:text-green-100">
-                  ${parseFloat(accountInfo.totalWalletBalance).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-green-700 dark:text-green-300">Available Balance</p>
-                <p className="text-lg font-bold text-green-900 dark:text-green-100">
-                  ${parseFloat(accountInfo.availableBalance).toLocaleString()}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant={accountInfo.canTrade ? 'default' : 'secondary'}>
-                Trading: {accountInfo.canTrade ? 'Enabled' : 'Disabled'}
-              </Badge>
-              <Badge variant={accountInfo.canDeposit ? 'default' : 'secondary'}>
-                Deposits: {accountInfo.canDeposit ? 'Enabled' : 'Disabled'}
-              </Badge>
-              <Badge variant={accountInfo.canWithdraw ? 'default' : 'secondary'}>
-                Withdrawals: {accountInfo.canWithdraw ? 'Enabled' : 'Disabled'}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* API Keys Form */}
+      {/* Add New Account Form */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            {hasKeys ? 'Update API Keys' : 'Add API Keys'}
-          </CardTitle>
+          <CardTitle>Add New Account</CardTitle>
           <CardDescription>
-            {hasKeys
-              ? 'Your API keys are currently stored and encrypted'
-              : 'Enter your Binance Futures API credentials'}
+            Register a new exchange account for automated trading
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Exchange Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="exchange">Exchange</Label>
+              <Select
+                value={selectedExchange}
+                onValueChange={(value: 'binance' | 'okx') => {
+                  setSelectedExchange(value);
+                  setValue('exchange', value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select exchange" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="binance">Binance Futures</SelectItem>
+                  <SelectItem value="okx">OKX Futures</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.exchange && (
+                <p className="text-sm text-destructive">{errors.exchange.message}</p>
+              )}
+            </div>
+
+            {/* Testnet Toggle */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="testnet"
+                checked={isTestnet}
+                onChange={(e) => {
+                  setIsTestnet(e.target.checked);
+                  setValue('testnet', e.target.checked);
+                }}
+                className="rounded"
+              />
+              <Label htmlFor="testnet">Use Testnet (Recommended for testing)</Label>
+            </div>
+
             {/* API Key Input */}
             <div className="space-y-2">
               <Label htmlFor="api_key">API Key</Label>
@@ -319,7 +398,7 @@ export default function ApiKeysPage() {
                 <Input
                   id="api_key"
                   type={showApiKey ? 'text' : 'password'}
-                  placeholder={hasKeys ? maskApiKey(storedApiKey) : 'Enter your 64-character API key'}
+                  placeholder="Enter your API key"
                   {...register('api_key')}
                   disabled={isLoading}
                   className="pr-10"
@@ -344,7 +423,7 @@ export default function ApiKeysPage() {
                 <Input
                   id="api_secret"
                   type={showApiSecret ? 'text' : 'password'}
-                  placeholder={hasKeys ? maskApiKey(storedApiSecret) : 'Enter your 64-character API secret'}
+                  placeholder="Enter your API secret"
                   {...register('api_secret')}
                   disabled={isLoading}
                   className="pr-10"
@@ -362,10 +441,30 @@ export default function ApiKeysPage() {
               )}
             </div>
 
-            {/* Last Verified */}
-            {lastVerified && (
-              <div className="text-sm text-muted-foreground">
-                Last verified: {new Date(lastVerified).toLocaleString()}
+            {/* Passphrase Input (OKX only) */}
+            {watchExchange === 'okx' && (
+              <div className="space-y-2">
+                <Label htmlFor="passphrase">Passphrase (OKX Required)</Label>
+                <div className="relative">
+                  <Input
+                    id="passphrase"
+                    type={showPassphrase ? 'text' : 'password'}
+                    placeholder="Enter your passphrase"
+                    {...register('passphrase')}
+                    disabled={isLoading}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassphrase(!showPassphrase)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassphrase ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.passphrase && (
+                  <p className="text-sm text-destructive">{errors.passphrase.message}</p>
+                )}
               </div>
             )}
 
@@ -386,41 +485,11 @@ export default function ApiKeysPage() {
               </Alert>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex items-center space-x-3">
-              <Button
-                type="submit"
-                disabled={isLoading || isVerifying}
-                className="flex-1"
-              >
-                <Save className="mr-2 h-4 w-4" />
-                {isLoading ? 'Saving...' : hasKeys ? 'Update Keys' : 'Save Keys'}
-              </Button>
-
-              {hasKeys && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleVerifyKeys}
-                    disabled={isLoading || isVerifying}
-                  >
-                    <Wallet className="mr-2 h-4 w-4" />
-                    {isVerifying ? 'Verifying...' : 'Verify Connection'}
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleDeleteKeys}
-                    disabled={isLoading || isVerifying}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                </>
-              )}
-            </div>
+            {/* Submit Button */}
+            <Button type="submit" disabled={isLoading} className="w-full">
+              <Save className="mr-2 h-4 w-4" />
+              {isLoading ? 'Registering...' : 'Register Account'}
+            </Button>
           </form>
         </CardContent>
       </Card>
@@ -434,7 +503,7 @@ export default function ApiKeysPage() {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-start space-x-2">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
-              <span>Create a dedicated API key for this bot (don't reuse existing keys)</span>
+              <span>Create dedicated API keys for this bot (don't reuse existing keys)</span>
             </li>
             <li className="flex items-start space-x-2">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
@@ -442,15 +511,15 @@ export default function ApiKeysPage() {
             </li>
             <li className="flex items-start space-x-2">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
-              <span>Add IP whitelist restrictions on Binance for enhanced security</span>
+              <span>Add IP whitelist restrictions on your exchange for enhanced security</span>
             </li>
             <li className="flex items-start space-x-2">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
-              <span>Never share your API Secret Key with anyone</span>
+              <span>Test with Testnet first before using real funds</span>
             </li>
             <li className="flex items-start space-x-2">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
-              <span>Regularly verify your API key status and rotate keys periodically</span>
+              <span>Never share your API Secret Key or Passphrase with anyone</span>
             </li>
           </ul>
         </CardContent>

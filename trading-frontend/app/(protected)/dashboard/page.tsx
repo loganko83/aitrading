@@ -2,89 +2,157 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import StatsWidget from '@/components/trading/StatsWidget';
-import PositionMonitor from '@/components/trading/PositionMonitor';
-import TradingChart from '@/components/trading/TradingChart';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Play, Pause, TrendingUp } from 'lucide-react';
-import { useTradingStore } from '@/lib/stores/tradingStore';
-import { fetchDashboardStats, fetchPositions } from '@/lib/api/trading';
-import type { Position } from '@/types';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  RefreshCw,
+  Play,
+  Pause,
+  TrendingUp,
+  Wallet,
+  Target,
+  AlertCircle,
+  TrendingDown,
+  DollarSign,
+} from 'lucide-react';
+import {
+  getAccountList,
+  getAccountBalance,
+  getAccountPositions,
+  type Position,
+  type AccountBalanceResponse,
+} from '@/lib/api/accounts';
+
+interface DashboardStats {
+  total_balance: number;
+  available_balance: number;
+  total_unrealized_pnl: number;
+  active_positions: number;
+  active_accounts: number;
+}
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const {
-    positions,
-    dashboardStats,
-    isAutoTrading,
-    setPositions,
-    setDashboardStats,
-    toggleAutoTrading,
-  } = useTradingStore();
-
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
-  // Load real data from backend API
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        // Fetch dashboard stats from API
-        const stats = await fetchDashboardStats();
-        setDashboardStats(stats);
-      } catch (error) {
-        console.error('Failed to fetch dashboard stats:', error);
-        // Fall back to mock data if API fails
-        setDashboardStats({
-          total_equity: 10500.00,
-          available_balance: 7200.00,
-          margin_used: 3300.00,
-          total_pnl: 850.00,
-          total_pnl_pct: 8.82,
-          today_pnl: 125.50,
-          today_pnl_pct: 1.21,
-          open_positions: 3,
-          total_trades: 47,
-          win_rate: 68.5,
-          xp_points: 1250,
-          level: 8,
-          next_level_xp: 1500,
-        });
-      }
-
-      try {
-        // Fetch positions from API
-        const positionsData = await fetchPositions();
-        setPositions(positionsData);
-      } catch (error) {
-        console.error('Failed to fetch positions:', error);
-        // Keep empty positions array if API fails
-        setPositions([]);
-      }
-    };
-
-    if (session) {
-      loadDashboardData();
+  const loadDashboardData = async () => {
+    if (!session?.user?.accessToken) {
+      setError('Please log in to view dashboard');
+      setIsLoading(false);
+      return;
     }
-  }, [session, setDashboardStats, setPositions]);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    // TODO: Implement actual data refresh from backend
-    setTimeout(() => {
+    try {
+      setError('');
+
+      // Get list of accounts
+      const accountsData = await getAccountList(session.user.accessToken);
+
+      if (accountsData.accounts.length === 0) {
+        setStats({
+          total_balance: 0,
+          available_balance: 0,
+          total_unrealized_pnl: 0,
+          active_positions: 0,
+          active_accounts: 0,
+        });
+        setPositions([]);
+        setAccounts([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch balance and positions for each account
+      const balancePromises = accountsData.accounts.map(acc =>
+        getAccountBalance(acc.id, session.user.accessToken).catch(err => {
+          console.error(`Failed to get balance for ${acc.id}:`, err);
+          return null;
+        })
+      );
+
+      const positionPromises = accountsData.accounts.map(acc =>
+        getAccountPositions(acc.id, session.user.accessToken).catch(err => {
+          console.error(`Failed to get positions for ${acc.id}:`, err);
+          return null;
+        })
+      );
+
+      const [balances, positionsData] = await Promise.all([
+        Promise.all(balancePromises),
+        Promise.all(positionPromises),
+      ]);
+
+      // Calculate total stats
+      let totalBalance = 0;
+      let availableBalance = 0;
+      let totalUnrealizedPnl = 0;
+      let allPositions: Position[] = [];
+
+      balances.forEach(balance => {
+        if (balance) {
+          totalBalance += parseFloat(balance.total_balance || '0');
+          availableBalance += parseFloat(balance.available_balance || '0');
+        }
+      });
+
+      positionsData.forEach(posData => {
+        if (posData && posData.positions) {
+          posData.positions.forEach(pos => {
+            totalUnrealizedPnl += parseFloat(pos.unrealized_pnl || '0');
+          });
+          allPositions.push(...posData.positions);
+        }
+      });
+
+      setStats({
+        total_balance: totalBalance,
+        available_balance: availableBalance,
+        total_unrealized_pnl: totalUnrealizedPnl,
+        active_positions: allPositions.length,
+        active_accounts: accountsData.accounts.length,
+      });
+
+      setPositions(allPositions);
+      setAccounts(accountsData.accounts.map(acc => `${acc.exchange.toUpperCase()} (${acc.testnet ? 'Testnet' : 'Mainnet'})`));
+
+    } catch (err: any) {
+      console.error('Failed to load dashboard data:', err);
+      setError(err.message || 'Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
       setIsRefreshing(false);
-    }, 1000);
+    }
   };
 
-  const handleToggleAutoTrading = () => {
-    toggleAutoTrading();
-    // TODO: Implement actual auto-trading toggle API call
+  useEffect(() => {
+    loadDashboardData();
+  }, [session]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadDashboardData();
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header Actions */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Trading Dashboard</h2>
@@ -92,137 +160,199 @@ export default function DashboardPage() {
             Monitor your positions and track your performance
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button
-            onClick={handleToggleAutoTrading}
-            variant={isAutoTrading ? 'destructive' : 'default'}
-            className="min-w-[140px]"
-          >
-            {isAutoTrading ? (
-              <>
-                <Pause className="mr-2 h-4 w-4" />
-                Stop Trading
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-4 w-4" />
-                Start Trading
-              </>
-            )}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
-      {/* Auto-Trading Status Banner */}
-      {isAutoTrading && (
-        <Card className="border-green-600 bg-green-50 dark:bg-green-950">
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center space-x-3">
-              <div className="h-3 w-3 rounded-full bg-green-600 animate-pulse"></div>
-              <div>
-                <p className="font-semibold text-green-900 dark:text-green-100">
-                  Auto-Trading Active
-                </p>
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  AI is monitoring markets and executing trades based on your settings
-                </p>
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* No Accounts Notice */}
+      {!isLoading && stats && stats.active_accounts === 0 && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No exchange accounts registered. Please add your API keys in the{' '}
+            <a href="/api-keys" className="text-primary hover:underline font-semibold">
+              API Keys
+            </a>{' '}
+            page to start trading.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Stats Widgets */}
+      {stats && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${stats.total_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.active_accounts} active account{stats.active_accounts !== 1 ? 's' : ''}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${stats.available_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ready for trading
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Unrealized PnL</CardTitle>
+              {stats.total_unrealized_pnl >= 0 ? (
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              ) : (
+                <TrendingDown className="h-4 w-4 text-red-600" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${stats.total_unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {stats.total_unrealized_pnl >= 0 ? '+' : ''}
+                ${stats.total_unrealized_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                From open positions
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Positions</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.active_positions}</div>
+              <p className="text-xs text-muted-foreground">
+                Open trades
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Active Positions */}
+      {positions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Positions</CardTitle>
+            <CardDescription>Your current open positions across all accounts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {positions.map((position, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold">{position.symbol}</span>
+                        <Badge variant={position.side === 'LONG' ? 'default' : 'secondary'}>
+                          {position.side}
+                        </Badge>
+                        <Badge variant="outline">{position.leverage}x</Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Entry: ${parseFloat(position.entry_price).toLocaleString()} |
+                        Mark: ${parseFloat(position.mark_price).toLocaleString()} |
+                        Size: {position.size}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-lg font-bold ${parseFloat(position.unrealized_pnl) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {parseFloat(position.unrealized_pnl) >= 0 ? '+' : ''}
+                      ${parseFloat(position.unrealized_pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    {position.liquidation_price && (
+                      <div className="text-xs text-muted-foreground">
+                        Liq: ${parseFloat(position.liquidation_price).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-            <Badge variant="secondary" className="bg-green-600 text-white">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              Live
-            </Badge>
           </CardContent>
         </Card>
       )}
 
-      {/* Stats Widgets */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsWidget
-          title="Total Balance"
-          value={`$${dashboardStats?.total_equity.toLocaleString() || '0'}`}
-          icon="wallet"
-        />
-        <StatsWidget
-          title="Available Balance"
-          value={`$${dashboardStats?.available_balance.toLocaleString() || '0'}`}
-          icon="wallet"
-        />
-        <StatsWidget
-          title="Total PnL"
-          value={`$${dashboardStats?.total_pnl.toLocaleString() || '0'}`}
-          change={`+${dashboardStats?.today_pnl.toLocaleString() || '0'} today`}
-          changeType={dashboardStats && dashboardStats.today_pnl >= 0 ? 'positive' : 'negative'}
-          icon="trending-up"
-        />
-        <StatsWidget
-          title="Win Rate"
-          value={`${dashboardStats?.win_rate.toFixed(1) || '0'}%`}
-          change={`${dashboardStats?.total_trades || 0} trades`}
-          changeType="neutral"
-          icon="target"
-        />
-      </div>
+      {/* Connected Accounts */}
+      {accounts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Connected Accounts</CardTitle>
+            <CardDescription>Your registered exchange accounts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {accounts.map((account, index) => (
+                <Badge key={index} variant="secondary">
+                  {account}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Trading Chart */}
-      <TradingChart
-        symbol="BTC/USDT"
-        showPositionMarkers={positions.length > 0}
-        entryPrice={positions.length > 0 ? positions[0].entry_price : undefined}
-        stopLoss={positions.length > 0 ? positions[0].sl_price : undefined}
-        takeProfit={positions.length > 0 ? positions[0].tp_price : undefined}
-        currentPrice={positions.length > 0 ? positions[0].current_price : undefined}
-      />
-
-      {/* Position Monitor - Real-time Position Monitoring */}
-      <PositionMonitor initialPositions={positions} autoRefresh={true} refreshInterval={5000} />
-
-      {/* Recent Activity */}
+      {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Your latest trades and system events</CardDescription>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Manage your trading setup</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between py-3 border-b">
-              <div className="flex items-center space-x-3">
-                <div className="h-2 w-2 rounded-full bg-green-600"></div>
-                <div>
-                  <p className="text-sm font-medium">Position Opened: BTC/USDT LONG</p>
-                  <p className="text-xs text-muted-foreground">4 hours ago</p>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button variant="outline" className="h-auto py-4" onClick={() => window.location.href = '/api-keys'}>
+              <div className="flex flex-col items-center space-y-2">
+                <Wallet className="h-5 w-5" />
+                <span>Manage API Keys</span>
               </div>
-              <Badge variant="secondary">+$37.50</Badge>
-            </div>
-            <div className="flex items-center justify-between py-3 border-b">
-              <div className="flex items-center space-x-3">
-                <div className="h-2 w-2 rounded-full bg-green-600"></div>
-                <div>
-                  <p className="text-sm font-medium">Position Opened: ETH/USDT LONG</p>
-                  <p className="text-xs text-muted-foreground">2 hours ago</p>
-                </div>
+            </Button>
+            <Button variant="outline" className="h-auto py-4" onClick={() => window.location.href = '/strategies'}>
+              <div className="flex flex-col items-center space-y-2">
+                <Target className="h-5 w-5" />
+                <span>View Strategies</span>
               </div>
-              <Badge variant="secondary">+$35.00</Badge>
-            </div>
-            <div className="flex items-center justify-between py-3">
-              <div className="flex items-center space-x-3">
-                <div className="h-2 w-2 rounded-full bg-green-600"></div>
-                <div>
-                  <p className="text-sm font-medium">Position Opened: SOL/USDT SHORT</p>
-                  <p className="text-xs text-muted-foreground">1 hour ago</p>
-                </div>
+            </Button>
+            <Button variant="outline" className="h-auto py-4" onClick={() => window.location.href = '/webhooks'}>
+              <div className="flex flex-col items-center space-y-2">
+                <TrendingUp className="h-5 w-5" />
+                <span>Setup Webhooks</span>
               </div>
-              <Badge variant="secondary">+$15.00</Badge>
-            </div>
+            </Button>
           </div>
         </CardContent>
       </Card>

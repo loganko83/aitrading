@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  otp: z.string().optional(),
+  totp_code: z.string().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -43,7 +43,7 @@ export default function LoginPage() {
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
-        otp: data.otp,
+        totp_code: data.totp_code,
         redirect: false,
       });
 
@@ -111,17 +111,17 @@ export default function LoginPage() {
 
             {otpRequired && (
               <div className="space-y-2">
-                <Label htmlFor="otp">Google Authenticator Code</Label>
+                <Label htmlFor="totp_code">Google Authenticator Code</Label>
                 <Input
-                  id="otp"
+                  id="totp_code"
                   type="text"
                   placeholder="000000"
                   maxLength={6}
-                  {...register('otp')}
+                  {...register('totp_code')}
                   disabled={isLoading}
                 />
-                {errors.otp && (
-                  <p className="text-sm text-destructive">{errors.otp.message}</p>
+                {errors.totp_code && (
+                  <p className="text-sm text-destructive">{errors.totp_code.message}</p>
                 )}
               </div>
             )}
