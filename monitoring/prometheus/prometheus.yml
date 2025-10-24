@@ -54,7 +54,7 @@ scrape_configs:
   # Nginx exporter (web server metrics)
   - job_name: 'nginx'
     static_configs:
-      - targets: ['nginx-exporter:9113']
+      - targets: ['13.239.192.158:9113']
     scrape_interval: 30s
 
   # cAdvisor (container metrics)
