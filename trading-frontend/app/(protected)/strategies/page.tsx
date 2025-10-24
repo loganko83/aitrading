@@ -1,601 +1,414 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
-  Plus,
+  RefreshCw,
+  Copy,
+  Check,
   TrendingUp,
-  Shield,
-  Zap,
-  Settings,
-  CheckCircle,
-  Circle,
-  Play,
-  Pause,
-  Trash2
-} from 'lucide-react'
+  BarChart3,
+  Sparkles,
+  Code,
+  AlertCircle,
+  ChevronRight,
+  Filter,
+} from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { useToast } from "@/hooks/use-toast"
-
-interface Strategy {
-  id: string
-  name: string
-  description: string
-  category: string
-  mlWeight: number
-  gpt4Weight: number
-  claudeWeight: number
-  taWeight: number
-  defaultLeverage: number
-  positionSizePct: number
-  maxOpenPositions: number
-  minProbability: number
-  minConfidence: number
-  usageCount: number
-  avgWinRate: number | null
-}
-
-interface StrategyConfig {
-  id: string
-  strategyId: string
-  name: string
-  isActive: boolean
-  autoTradeEnabled: boolean
-  selectedSymbols: string[]
-  totalTrades: number
-  winRate: number | null
-  totalPnl: number
-  strategy: Strategy
-}
-
-interface AutoTradeStatus {
-  isRunning: boolean
-  strategyName?: string
-  symbols?: string[]
-  message: string
-}
+  getStrategyList,
+  customizeStrategy,
+  type StrategyTemplate,
+  type CustomizeStrategyRequest,
+} from '@/lib/api/strategies';
+import { getAccountList } from '@/lib/api/accounts';
 
 export default function StrategiesPage() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [strategies, setStrategies] = useState<Strategy[]>([])
-  const [myConfigs, setMyConfigs] = useState<StrategyConfig[]>([])
-  const [autoTradeStatus, setAutoTradeStatus] = useState<AutoTradeStatus>({
-    isRunning: false,
-    message: 'Not running'
-  })
-  const [loading, setLoading] = useState(true)
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null)
-  const [newConfigName, setNewConfigName] = useState('')
-  const [selectedSymbols, setSelectedSymbols] = useState('BTCUSDT')
+  const { data: session } = useSession();
+  const [strategies, setStrategies] = useState<StrategyTemplate[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedStrategy, setSelectedStrategy] = useState<StrategyTemplate | null>(null);
+  const [customizationOpen, setCustomizationOpen] = useState(false);
+  const [pineScriptCode, setPineScriptCode] = useState('');
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterDifficulty, setFilterDifficulty] = useState<string>('');
 
-  // Load strategies and configs
   useEffect(() => {
-    loadData()
-  }, [])
+    loadData();
+  }, [session, filterCategory, filterDifficulty]);
 
   const loadData = async () => {
+    if (!session?.user?.accessToken) {
+      setError('Please log in to view strategies');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      setLoading(true)
+      setError('');
 
-      // Load all strategies
-      const strategiesRes = await fetch('/api/strategies')
-      const strategiesData = await strategiesRes.json()
-      setStrategies(strategiesData)
+      // Load strategies and accounts in parallel
+      const [strategiesData, accountsData] = await Promise.all([
+        getStrategyList(
+          filterCategory || undefined,
+          filterDifficulty || undefined,
+          0
+        ),
+        getAccountList(session.user.accessToken),
+      ]);
 
-      // Load user's configs
-      const configsRes = await fetch('/api/strategies/configs/my')
-      const configsData = await configsRes.json()
-      setMyConfigs(configsData)
-
-      // Load auto-trade status
-      const statusRes = await fetch('/api/strategies/auto-trade/status')
-      const statusData = await statusRes.json()
-      setAutoTradeStatus(statusData)
-
-    } catch (error) {
-      console.error('Error loading data:', error)
-      toast({
-        title: "오류",
-        description: "데이터를 불러오는 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
+      setStrategies(strategiesData);
+      setAccounts(accountsData.accounts);
+    } catch (err: any) {
+      console.error('Failed to load data:', err);
+      setError(err.message || 'Failed to load strategies');
     } finally {
-      setLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  // Create new config
-  const handleCreateConfig = async () => {
-    if (!selectedStrategy) return
+  const handleCustomizeStrategy = async (strategy: StrategyTemplate) => {
+    setSelectedStrategy(strategy);
+
+    if (accounts.length === 0) {
+      setError('No API keys registered. Please add your exchange API keys first.');
+      return;
+    }
+
+    setCustomizationOpen(true);
+  };
+
+  const generatePineScript = async (accountId: string, webhookSecret: string) => {
+    if (!selectedStrategy) return;
 
     try {
-      const response = await fetch('/api/strategies/configs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          strategyId: selectedStrategy.id,
-          name: newConfigName || selectedStrategy.name,
-          selectedSymbols: selectedSymbols.split(',').map(s => s.trim())
-        })
-      })
+      const request: CustomizeStrategyRequest = {
+        strategy_id: selectedStrategy.id,
+        account_id: accountId,
+        webhook_secret: webhookSecret,
+        symbol: 'BTCUSDT',
+      };
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to create config')
-      }
-
-      toast({
-        title: "성공",
-        description: "전략이 추가되었습니다.",
-      })
-
-      setShowCreateDialog(false)
-      setNewConfigName('')
-      setSelectedSymbols('BTCUSDT')
-      setSelectedStrategy(null)
-      loadData()
-
-    } catch (error: any) {
-      toast({
-        title: "오류",
-        description: error.message || "전략 추가 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
+      const response = await customizeStrategy(request);
+      setPineScriptCode(response.pine_script_code);
+      setCustomizationOpen(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to customize strategy');
     }
-  }
+  };
 
-  // Activate/deactivate config
-  const handleToggleActive = async (configId: string, currentStatus: boolean) => {
+  const copyToClipboard = async () => {
     try {
-      const response = await fetch(`/api/strategies/configs/${configId}/activate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !currentStatus })
-      })
-
-      if (!response.ok) throw new Error('Failed to toggle active status')
-
-      toast({
-        title: "성공",
-        description: currentStatus ? "전략이 비활성화되었습니다." : "전략이 활성화되었습니다.",
-      })
-
-      loadData()
-
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "전략 상태 변경 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
+      await navigator.clipboard.writeText(pineScriptCode);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
-  }
+  };
 
-  // Toggle auto-trading
-  const handleToggleAutoTrade = async (configId: string, enabled: boolean) => {
-    try {
-      const response = await fetch(`/api/strategies/configs/${configId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autoTradeEnabled: !enabled })
-      })
-
-      if (!response.ok) throw new Error('Failed to toggle auto-trade')
-
-      toast({
-        title: "성공",
-        description: enabled ? "자동 거래가 비활성화되었습니다." : "자동 거래가 활성화되었습니다.",
-      })
-
-      loadData()
-
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "자동 거래 설정 변경 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Beginner':
+        return 'bg-green-500';
+      case 'Intermediate':
+        return 'bg-yellow-500';
+      case 'Advanced':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
     }
-  }
-
-  // Start auto-trading
-  const handleStartAutoTrading = async () => {
-    try {
-      const response = await fetch('/api/strategies/auto-trade/start', {
-        method: 'POST'
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to start auto-trading')
-      }
-
-      toast({
-        title: "성공",
-        description: "자동 거래가 시작되었습니다.",
-      })
-
-      loadData()
-
-    } catch (error: any) {
-      toast({
-        title: "오류",
-        description: error.message || "자동 거래 시작 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Stop auto-trading
-  const handleStopAutoTrading = async () => {
-    try {
-      const response = await fetch('/api/strategies/auto-trade/stop', {
-        method: 'POST'
-      })
-
-      if (!response.ok) throw new Error('Failed to stop auto-trading')
-
-      toast({
-        title: "성공",
-        description: "자동 거래가 중지되었습니다.",
-      })
-
-      loadData()
-
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "자동 거래 중지 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // Delete config
-  const handleDeleteConfig = async (configId: string) => {
-    if (!confirm('정말 이 전략을 삭제하시겠습니까?')) return
-
-    try {
-      const response = await fetch(`/api/strategies/configs/${configId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to delete config')
-      }
-
-      toast({
-        title: "성공",
-        description: "전략이 삭제되었습니다.",
-      })
-
-      loadData()
-
-    } catch (error: any) {
-      toast({
-        title: "오류",
-        description: error.message || "전략 삭제 중 오류가 발생했습니다.",
-        variant: "destructive",
-      })
-    }
-  }
+  };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'AI_ENSEMBLE':
-        return <Zap className="h-4 w-4" />
-      case 'TECHNICAL':
-        return <TrendingUp className="h-4 w-4" />
-      case 'HYBRID':
-        return <Settings className="h-4 w-4" />
+      case 'Trend Following':
+        return <TrendingUp className="h-5 w-5" />;
+      case 'Mean Reversion':
+        return <BarChart3 className="h-5 w-5" />;
       default:
-        return <Shield className="h-4 w-4" />
+        return <Sparkles className="h-5 w-5" />;
     }
-  }
+  };
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'AI_ENSEMBLE':
-        return 'bg-purple-500/10 text-purple-500 border-purple-500/20'
-      case 'TECHNICAL':
-        return 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-      case 'HYBRID':
-        return 'bg-green-500/10 text-green-500 border-green-500/20'
-      default:
-        return 'bg-gray-500/10 text-gray-500 border-gray-500/20'
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="container py-8">
+      <div className="space-y-6">
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">로딩 중...</p>
+          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">거래 전략</h1>
-          <p className="text-muted-foreground mt-2">
-            AI 앙상블 전략을 선택하고 자동 거래를 시작하세요
+          <h2 className="text-3xl font-bold tracking-tight">Trading Strategies</h2>
+          <p className="text-muted-foreground">
+            Choose from verified strategies or create your own with AI
           </p>
         </div>
+        <Button variant="outline" size="icon" onClick={loadData}>
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
-      {/* Auto-Trading Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {autoTradeStatus.isRunning ? (
-              <><Play className="h-5 w-5 text-green-500" /> 자동 거래 실행 중</>
-            ) : (
-              <><Pause className="h-5 w-5 text-gray-500" /> 자동 거래 중지</>
-            )}
-          </CardTitle>
-          <CardDescription>
-            {autoTradeStatus.isRunning && autoTradeStatus.strategyName
-              ? `전략: ${autoTradeStatus.strategyName} | 심볼: ${autoTradeStatus.symbols?.join(', ')}`
-              : '자동 거래를 시작하려면 전략을 활성화하고 자동 거래를 활성화하세요.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {autoTradeStatus.isRunning ? (
-            <Button variant="destructive" onClick={handleStopAutoTrading}>
-              <Pause className="mr-2 h-4 w-4" />
-              자동 거래 중지
-            </Button>
-          ) : (
-            <Button onClick={handleStartAutoTrading}>
-              <Play className="mr-2 h-4 w-4" />
-              자동 거래 시작
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      {/* My Strategies */}
-      <div>
-        <h2 className="text-2xl font-semibold mb-4">내 전략</h2>
-        {myConfigs.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center text-muted-foreground">
-                <p>아직 선택한 전략이 없습니다.</p>
-                <p className="text-sm mt-2">아래에서 전략을 선택하세요.</p>
+      {/* Filters */}
+      <div className="flex gap-4">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="border rounded-md px-3 py-2 text-sm"
+          >
+            <option value="">All Categories</option>
+            <option value="Trend Following">Trend Following</option>
+            <option value="Mean Reversion">Mean Reversion</option>
+            <option value="Breakout">Breakout</option>
+          </select>
+        </div>
+
+        <select
+          value={filterDifficulty}
+          onChange={(e) => setFilterDifficulty(e.target.value)}
+          className="border rounded-md px-3 py-2 text-sm"
+        >
+          <option value="">All Levels</option>
+          <option value="Beginner">Beginner</option>
+          <option value="Intermediate">Intermediate</option>
+          <option value="Advanced">Advanced</option>
+        </select>
+      </div>
+
+      {/* Strategy Cards */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {strategies.map((strategy) => (
+          <Card key={strategy.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-2">
+                  {getCategoryIcon(strategy.category)}
+                  <CardTitle className="text-lg">{strategy.name}</CardTitle>
+                </div>
+                <Badge className={getDifficultyColor(strategy.difficulty)}>
+                  {strategy.difficulty}
+                </Badge>
+              </div>
+              <CardDescription className="line-clamp-2">
+                {strategy.description}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Indicators */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Indicators:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {strategy.indicators.map((indicator) => (
+                      <Badge key={indicator} variant="outline" className="text-xs">
+                        {indicator}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Backtest Results */}
+                {strategy.backtest_results && (
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Win Rate</p>
+                      <p className="font-semibold text-green-600">
+                        {(strategy.backtest_results.win_rate! * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Profit Factor</p>
+                      <p className="font-semibold">
+                        {strategy.backtest_results.profit_factor?.toFixed(2) || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Sharpe Ratio</p>
+                      <p className="font-semibold">
+                        {strategy.backtest_results.sharpe_ratio?.toFixed(2) || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Max Drawdown</p>
+                      <p className="font-semibold text-red-600">
+                        {(strategy.backtest_results.max_drawdown! * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Popularity */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs text-muted-foreground">Popularity:</span>
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <span
+                          key={i}
+                          className={`text-xs ${
+                            i < strategy.popularity_score / 20 ? 'text-yellow-500' : 'text-gray-300'
+                          }`}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {strategy.category}
+                  </Badge>
+                </div>
+
+                {/* Actions */}
+                <Button
+                  className="w-full"
+                  onClick={() => handleCustomizeStrategy(strategy)}
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  Get Pine Script
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
               </div>
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {myConfigs.map((config) => (
-              <Card key={config.id} className={config.isActive ? 'border-primary' : ''}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        {config.isActive && <CheckCircle className="h-5 w-5 text-primary" />}
-                        {config.name}
-                      </CardTitle>
-                      <CardDescription className="mt-2">
-                        {config.strategy.description.split('\n')[0]}
-                      </CardDescription>
-                    </div>
-                    <Badge className={getCategoryColor(config.strategy.category)}>
-                      {getCategoryIcon(config.strategy.category)}
-                      <span className="ml-1">{config.strategy.category}</span>
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">총 거래</p>
-                      <p className="font-semibold">{config.totalTrades}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">승률</p>
-                      <p className="font-semibold">
-                        {config.winRate ? `${(config.winRate * 100).toFixed(1)}%` : '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">총 수익</p>
-                      <p className={`font-semibold ${config.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        ${config.totalPnl.toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">심볼</p>
-                      <p className="font-semibold text-xs">{config.selectedSymbols.join(', ')}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant={config.isActive ? 'default' : 'outline'}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleToggleActive(config.id, config.isActive)}
-                    >
-                      {config.isActive ? <CheckCircle className="mr-2 h-4 w-4" /> : <Circle className="mr-2 h-4 w-4" />}
-                      {config.isActive ? '활성' : '비활성'}
-                    </Button>
-                    <Button
-                      variant={config.autoTradeEnabled ? 'default' : 'outline'}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleToggleAutoTrade(config.id, config.autoTradeEnabled)}
-                    >
-                      {config.autoTradeEnabled ? <Play className="mr-2 h-4 w-4" /> : <Pause className="mr-2 h-4 w-4" />}
-                      자동 거래
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/strategies/${config.id}`)}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteConfig(config.id)}
-                      disabled={config.autoTradeEnabled}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        ))}
       </div>
 
-      {/* Available Strategies */}
-      <div>
-        <h2 className="text-2xl font-semibold mb-4">사용 가능한 전략</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {strategies.map((strategy) => (
-            <Card key={strategy.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg">{strategy.name}</CardTitle>
-                  <Badge className={getCategoryColor(strategy.category)}>
-                    {getCategoryIcon(strategy.category)}
-                    <span className="ml-1">{strategy.category}</span>
-                  </Badge>
-                </div>
-                <CardDescription className="mt-2 line-clamp-3">
-                  {strategy.description.split('\n')[2] || strategy.description.split('\n')[0]}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">ML</p>
-                    <p className="font-semibold">{(strategy.mlWeight * 100).toFixed(0)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">GPT-4</p>
-                    <p className="font-semibold">{(strategy.gpt4Weight * 100).toFixed(0)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Claude</p>
-                    <p className="font-semibold">{(strategy.claudeWeight * 100).toFixed(0)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">TA</p>
-                    <p className="font-semibold">{(strategy.taWeight * 100).toFixed(0)}%</p>
-                  </div>
-                </div>
+      {/* No Strategies */}
+      {strategies.length === 0 && !isLoading && (
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <p className="text-muted-foreground">
+              No strategies found matching your filters.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-                <div className="grid grid-cols-2 gap-2 text-sm pt-2 border-t">
-                  <div>
-                    <p className="text-muted-foreground">레버리지</p>
-                    <p className="font-semibold">{strategy.defaultLeverage}x</p>
+      {/* Customization Modal - Simple version */}
+      {customizationOpen && selectedStrategy && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader>
+              <CardTitle>Customize {selectedStrategy.name}</CardTitle>
+              <CardDescription>
+                Select an account and generate Pine Script with webhook integration
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {accounts.length > 0 ? (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Select Account:</label>
+                    {accounts.map((account) => (
+                      <Button
+                        key={account.id}
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => generatePineScript(account.id, 'your_webhook_secret')}
+                      >
+                        {account.exchange.toUpperCase()} ({account.testnet ? 'Testnet' : 'Mainnet'})
+                      </Button>
+                    ))}
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">포지션 크기</p>
-                    <p className="font-semibold">{(strategy.positionSizePct * 100).toFixed(0)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">최소 확률</p>
-                    <p className="font-semibold">{(strategy.minProbability * 100).toFixed(0)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">사용자</p>
-                    <p className="font-semibold">{strategy.usageCount}</p>
-                  </div>
+                  <Button variant="ghost" onClick={() => setCustomizationOpen(false)} className="w-full">
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    No API keys registered. Please add your exchange API keys first.
+                  </p>
+                  <Button onClick={() => (window.location.href = '/api-keys')} className="w-full">
+                    Go to API Keys
+                  </Button>
                 </div>
-
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    setSelectedStrategy(strategy)
-                    setShowCreateDialog(true)
-                  }}
-                  disabled={myConfigs.some(c => c.strategyId === strategy.id)}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {myConfigs.some(c => c.strategyId === strategy.id) ? '이미 추가됨' : '전략 추가'}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+              )}
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      )}
 
-      {/* Create Config Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>전략 추가</DialogTitle>
-            <DialogDescription>
-              {selectedStrategy?.name} 전략을 추가합니다.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">전략 이름</Label>
-              <Input
-                id="name"
-                placeholder={selectedStrategy?.name}
-                value={newConfigName}
-                onChange={(e) => setNewConfigName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="symbols">거래 심볼 (쉼표로 구분)</Label>
-              <Input
-                id="symbols"
-                placeholder="BTCUSDT, ETHUSDT"
-                value={selectedSymbols}
-                onChange={(e) => setSelectedSymbols(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                예: BTCUSDT, ETHUSDT, BNBUSDT
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              취소
-            </Button>
-            <Button onClick={handleCreateConfig}>
-              추가
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Pine Script Code Modal */}
+      {pineScriptCode && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Pine Script Code</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyToClipboard}
+                  className="gap-2"
+                >
+                  {copiedCode ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy Code
+                    </>
+                  )}
+                </Button>
+              </div>
+              <CardDescription>
+                Copy this code and paste it into TradingView Pine Editor
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
+                <code>{pineScriptCode}</code>
+              </pre>
+
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Next Steps:</strong>
+                  <ol className="list-decimal list-inside mt-2 space-y-1 text-sm">
+                    <li>Open TradingView Pine Editor</li>
+                    <li>Paste the code above</li>
+                    <li>Click "Add to chart"</li>
+                    <li>Create alert with Webhook URL: <code className="bg-muted px-1 py-0.5 rounded">http://YOUR_SERVER:8001/api/v1/webhook/tradingview</code></li>
+                    <li>Test in Testnet first!</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
+
+              <Button onClick={() => setPineScriptCode('')} className="w-full">
+                Close
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
-  )
+  );
 }
