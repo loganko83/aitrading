@@ -1,9 +1,6 @@
 """Security utilities for password hashing and verification"""
 
-from passlib.context import CryptContext
-
-# Configure bcrypt password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 
 def hash_password(password: str) -> str:
@@ -21,7 +18,10 @@ def hash_password(password: str) -> str:
         >>> print(hashed)
         $2b$12$KIX...
     """
-    return pwd_context.hash(password)
+    password_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -42,4 +42,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         >>> verify_password("wrongPassword", hashed)
         False
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    password_bytes = plain_password.encode('utf-8')
+    hashed_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(password_bytes, hashed_bytes)
