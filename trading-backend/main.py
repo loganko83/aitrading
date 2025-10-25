@@ -224,7 +224,7 @@ async def shutdown_event():
 
 
 # Import and include API routers
-from app.api.v1 import trading, websocket as ws_router, strategies, backtest, simple, health, performance, optimize, webhook, accounts, accounts_secure, telegram, pine_script, symbols, market, positions, portfolio, ai_prediction, signal
+from app.api.v1 import trading, websocket as ws_router, strategies, backtest, simple, health, performance, optimize, webhook, accounts, accounts_secure, telegram, pine_script, symbols, market, positions, portfolio, ai_prediction, signal, auth
 
 # Health monitoring (system stability status)
 app.include_router(
@@ -273,6 +273,13 @@ app.include_router(
     accounts_secure.router,
     prefix=f"{settings.API_V1_PREFIX}",
     tags=["🔐 Secure Account Management (Recommended)"]
+)
+
+# Authentication API (Login, Register, 2FA)
+app.include_router(
+    auth.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["🔑 Authentication"]
 )
 
 # Telegram Notification API
