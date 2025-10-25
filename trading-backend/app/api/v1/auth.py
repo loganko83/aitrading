@@ -8,7 +8,7 @@ from sqlalchemy import select
 from pydantic import BaseModel, EmailStr, Field
 import uuid
 
-from app.database.session import get_async_db
+from app.database.base import get_db
 from app.models.user import User
 from app.core.security import hash_password, verify_password
 from app.core.jwt_service import (
@@ -158,7 +158,7 @@ async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     request: RegisterRequest,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     회원가입
@@ -213,7 +213,7 @@ async def register(
 @router.post("/login", response_model=LoginResponse)
 async def login(
     request: LoginRequest,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     로그인
@@ -286,7 +286,7 @@ async def login(
 
 @router.post("/2fa/setup", response_model=Setup2FAResponse)
 async def setup_2fa(
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db),
     current_user_id: str = Depends(get_user_id)
 ):
     """
@@ -341,7 +341,7 @@ async def setup_2fa(
 @router.post("/2fa/verify", response_model=Verify2FAResponse)
 async def verify_2fa(
     request: Verify2FARequest,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db),
     current_user_id: str = Depends(get_user_id)
 ):
     """
@@ -394,7 +394,7 @@ async def verify_2fa(
 @router.post("/2fa/disable", response_model=Verify2FAResponse)
 async def disable_2fa(
     request: Verify2FARequest,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db),
     current_user_id: str = Depends(get_user_id)
 ):
     """
@@ -534,7 +534,7 @@ async def logout(request: LogoutRequest):
 
 @router.get("/me")
 async def get_current_user(
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession = Depends(get_db),
     current_user_id: str = Depends(get_user_id)
 ):
     """
