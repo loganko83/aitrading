@@ -53,6 +53,9 @@ else:
         expire_on_commit=False
     )
 
+    # For compatibility with code that checks is_sqlite
+    SessionLocal = None
+
 # Base class for all models
 Base = declarative_base()
 
