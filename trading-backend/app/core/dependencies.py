@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_async_db
+from app.database.base import get_db
 from app.core.jwt_service import verify_token
 from app.models.user import User
 
@@ -20,7 +20,7 @@ security = HTTPBearer()
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     """
     JWT 토큰을 검증하고 현재 사용자 정보를 반환합니다.
