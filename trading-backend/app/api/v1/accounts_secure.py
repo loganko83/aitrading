@@ -12,7 +12,8 @@ Features:
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import uuid
 import logging
 
@@ -84,7 +85,7 @@ async def register_exchange_account(
     request: Request,
     account: ExchangeAccountCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: None = Depends(csrf_protect)
 ):
     """
@@ -186,8 +187,8 @@ async def register_exchange_account(
         )
 
         db.add(api_key_record)
-        db.commit()
-        db.refresh(api_key_record)
+        await db.commit()
+        await db.refresh(api_key_record)
 
         # OrderExecutor에도 등록 (메모리)
         account_id = f"{current_user.id}_{api_key_record.id}"
@@ -221,7 +222,7 @@ async def register_exchange_account(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Failed to register exchange account: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -229,7 +230,7 @@ async def register_exchange_account(
 @router.get("/list", response_model=ExchangeAccountList)
 async def list_exchange_accounts(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     등록된 거래소 계정 목록 조회
@@ -239,10 +240,13 @@ async def list_exchange_accounts(
     - 사용자 본인의 계정만 조회 가능
     """
     try:
-        accounts = db.query(ApiKey).filter(
-            ApiKey.user_id == current_user.id,
-            ApiKey.is_active == True
-        ).all()
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.user_id == current_user.id,
+                ApiKey.is_active == True
+            )
+        )
+        accounts = result.scalars().all()
 
         account_list = [
             ExchangeAccountResponse(
@@ -271,7 +275,7 @@ async def update_exchange_account(
     account_id: str,
     account: ExchangeAccountCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: None = Depends(csrf_protect)
 ):
     """
@@ -292,10 +296,13 @@ async def update_exchange_account(
         logger.info(f"User {current_user.email} updating account {account_id}")
 
         # 기존 계정 조회
-        api_key_record = db.query(ApiKey).filter(
-            ApiKey.id == account_id,
-            ApiKey.user_id == current_user.id
-        ).first()
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.id == account_id,
+                ApiKey.user_id == current_user.id
+            )
+        )
+        api_key_record = result.scalar_one_or_none()
 
         if not api_key_record:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -375,8 +382,8 @@ async def update_exchange_account(
         api_key_record.passphrase = encrypted.get("passphrase")
         api_key_record.testnet = account.testnet
 
-        db.commit()
-        db.refresh(api_key_record)
+        await db.commit()
+        await db.refresh(api_key_record)
 
         # OrderExecutor 업데이트
         executor_account_id = f"{current_user.id}_{account_id}"
@@ -417,7 +424,7 @@ async def update_exchange_account(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Failed to update account: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -427,7 +434,7 @@ async def delete_exchange_account(
     request: Request,
     account_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: None = Depends(csrf_protect)
 ):
     """
@@ -441,10 +448,13 @@ async def delete_exchange_account(
     """
     try:
         # 계정 조회
-        api_key_record = db.query(ApiKey).filter(
-            ApiKey.id == account_id,
-            ApiKey.user_id == current_user.id
-        ).first()
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.id == account_id,
+                ApiKey.user_id == current_user.id
+            )
+        )
+        api_key_record = result.scalar_one_or_none()
 
         if not api_key_record:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -460,8 +470,8 @@ async def delete_exchange_account(
                 del order_executor.okx_clients[executor_account_id]
 
         # 데이터베이스에서 삭제
-        db.delete(api_key_record)
-        db.commit()
+        await db.delete(api_key_record)
+        await db.commit()
 
         logger.info(f"Account deleted: {account_id}")
 
@@ -473,7 +483,7 @@ async def delete_exchange_account(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Failed to delete account: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -483,7 +493,7 @@ async def toggle_account_status(
     request: Request,
     account_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     _: None = Depends(csrf_protect)
 ):
     """
@@ -496,18 +506,21 @@ async def toggle_account_status(
     비활성화된 계정은 자동 주문에 사용되지 않습니다.
     """
     try:
-        api_key_record = db.query(ApiKey).filter(
-            ApiKey.id == account_id,
-            ApiKey.user_id == current_user.id
-        ).first()
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.id == account_id,
+                ApiKey.user_id == current_user.id
+            )
+        )
+        api_key_record = result.scalar_one_or_none()
 
         if not api_key_record:
             raise HTTPException(status_code=404, detail="Account not found")
 
         # 상태 토글
         api_key_record.is_active = not api_key_record.is_active
-        db.commit()
-        db.refresh(api_key_record)
+        await db.commit()
+        await db.refresh(api_key_record)
 
         logger.info(f"Account {account_id} toggled to: {api_key_record.is_active}")
 
@@ -520,7 +533,7 @@ async def toggle_account_status(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Failed to toggle account: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -529,7 +542,7 @@ async def toggle_account_status(
 async def get_account_balance(
     account_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     계정 잔액 실시간 조회
@@ -546,10 +559,13 @@ async def get_account_balance(
     """
     try:
         # 계정 조회
-        api_key_record = db.query(ApiKey).filter(
-            ApiKey.id == account_id,
-            ApiKey.user_id == current_user.id
-        ).first()
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.id == account_id,
+                ApiKey.user_id == current_user.id
+            )
+        )
+        api_key_record = result.scalar_one_or_none()
 
         if not api_key_record:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -600,7 +616,7 @@ async def get_account_positions(
     account_id: str,
     symbol: Optional[str] = None,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     계정 포지션 실시간 조회
@@ -618,10 +634,13 @@ async def get_account_positions(
     """
     try:
         # 계정 조회
-        api_key_record = db.query(ApiKey).filter(
-            ApiKey.id == account_id,
-            ApiKey.user_id == current_user.id
-        ).first()
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.id == account_id,
+                ApiKey.user_id == current_user.id
+            )
+        )
+        api_key_record = result.scalar_one_or_none()
 
         if not api_key_record:
             raise HTTPException(status_code=404, detail="Account not found")
