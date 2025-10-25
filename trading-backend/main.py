@@ -133,7 +133,7 @@ async def startup_event():
     # Initialize database (with Slow Query Logger)
     logger.info("Initializing database connection...")
     from app.database.base import engine
-    logger.info("✅ Database initialized with query performance monitoring")
+    logger.info("Database initialized with query performance monitoring")
 
     # Initialize cache system
     from app.core.cache import initialize_cache, cache_cleanup_task
@@ -151,9 +151,9 @@ async def startup_event():
     from app.core.redis_client import RedisClient
     try:
         await RedisClient.get_client()
-        logger.info("✅ Redis client initialized successfully")
+        logger.info("Redis client initialized successfully")
     except Exception as e:
-        logger.warning(f"⚠️ Redis initialization failed: {e}. Caching will be disabled.")
+        logger.warning(f"WARNING: Redis initialization failed: {e}. Caching will be disabled.")
 
     # Start risk monitoring service
     logger.info("Starting risk monitoring service...")
@@ -164,15 +164,18 @@ async def startup_event():
     logger.info("Initializing WebSocket connection pool...")
     from app.services.websocket_pool import websocket_pool
     await websocket_pool.start()
-    logger.info("✅ WebSocket connection pool started")
+    logger.info("WebSocket connection pool started")
 
     # Initialize WebSocket coordinator (worker communication)
     logger.info("Initializing WebSocket coordinator...")
     from app.services.websocket_manager import websocket_manager
     from app.core.redis_pubsub import WebSocketCoordinator
-    websocket_manager.coordinator = WebSocketCoordinator(websocket_manager.worker_id)
-    await websocket_manager.coordinator.start()
-    logger.info(f"✅ WebSocket coordinator started (worker: {websocket_manager.worker_id})")
+    try:
+        websocket_manager.coordinator = WebSocketCoordinator(websocket_manager.worker_id)
+        await websocket_manager.coordinator.start()
+        logger.info(f"WebSocket coordinator started (worker: {websocket_manager.worker_id})")
+    except Exception as e:
+        logger.warning(f"WARNING: WebSocket coordinator initialization failed: {e}. Worker coordination will be disabled.")
 
     # TODO: Initialize market monitor for selected symbols
     # from app.workers.market_monitor import MarketMonitor
@@ -180,7 +183,7 @@ async def startup_event():
     # await market_monitor.start()
 
     logger.info(
-        "✅ Backend started successfully with:\n"
+        "Backend started successfully with:\n"
         "  - Database query optimization (18 indexes + slow query monitoring)\n"
         "  - Redis caching system\n"
         "  - WebSocket connection pooling and scaling\n"
@@ -220,7 +223,7 @@ async def shutdown_event():
     # TODO: Stop market monitor
     # await market_monitor.stop()
 
-    logger.info("✅ Backend shutdown complete")
+    logger.info("Backend shutdown complete")
 
 
 # Import and include API routers

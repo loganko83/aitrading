@@ -11,7 +11,7 @@ _env_file = f".env.{_environment}"
 if not os.path.exists(_env_file):
     _env_file = ".env"
 
-print(f"🔧 Loading configuration from: {_env_file}")
+print(f"Loading configuration from: {_env_file}")
 
 
 class Settings(BaseSettings):
@@ -136,10 +136,10 @@ class Settings(BaseSettings):
 
         # 프로덕션에서는 테스트넷 사용 불가 (경고만)
         if self.BINANCE_TESTNET:
-            print("⚠️  WARNING: BINANCE_TESTNET is True in production - ensure this is intentional")
+            print("WARNING: BINANCE_TESTNET is True in production - ensure this is intentional")
 
         if self.OKX_TESTNET:
-            print("⚠️  WARNING: OKX_TESTNET is True in production - ensure this is intentional")
+            print("WARNING: OKX_TESTNET is True in production - ensure this is intentional")
 
         if errors:
             raise ValueError(f"Production configuration errors: {', '.join(errors)}")
@@ -152,7 +152,7 @@ def get_settings() -> Settings:
     # 프로덕션 환경 설정 검증
     if settings.is_production:
         settings.validate_production_settings()
-        print("✅ Production configuration validated")
+        print("Production configuration validated")
 
     return settings
 

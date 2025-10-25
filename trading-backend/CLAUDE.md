@@ -156,16 +156,49 @@ MAX_POSITION_SIZE_PCT=0.10
 
 ## 🚀 빠른 시작
 
-### 1. 서버 실행
+### 로컬 개발 환경 (Windows)
 ```bash
 cd C:\dev\trading\trading-backend
 python main.py
 # http://localhost:8001
 ```
 
+### AWS 운영 서버 (trendy.storydot.kr)
+
+**서버 접속**:
+```bash
+ssh -i "C:\server\firstkeypair.pem" ubuntu@13.239.192.158
+```
+
+**프로젝트 위치**: `/mnt/storage/trading/`
+
+**서비스 관리**:
+```bash
+# 백엔드 (FastAPI + Gunicorn)
+sudo systemctl status trading-backend
+sudo systemctl restart trading-backend
+sudo systemctl stop trading-backend
+
+# 프론트엔드 (Next.js + PM2)
+pm2 list
+pm2 restart trading-frontend
+pm2 stop trading-frontend
+pm2 logs trading-frontend
+
+# 로그 확인
+tail -f /mnt/storage/trading/trading-backend/logs/error.log
+pm2 logs trading-frontend --lines 50
+```
+
+**URL**:
+- 프론트엔드: https://trendy.storydot.kr/trading/
+- 백엔드 API: https://trendy.storydot.kr/api/v1/
+- Swagger: https://trendy.storydot.kr/docs
+
 ### 2. API 문서 확인
 ```
-Swagger UI: http://localhost:8001/docs
+Swagger UI: http://localhost:8001/docs (로컬)
+Swagger UI: https://trendy.storydot.kr/docs (운영)
 ReDoc: http://localhost:8001/redoc
 ```
 

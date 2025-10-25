@@ -9,7 +9,8 @@ Features:
 
 from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional
 import jwt
 from datetime import datetime
@@ -59,9 +60,9 @@ def verify_jwt_token(token: str) -> dict:
         )
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     """
     현재 로그인한 사용자 가져오기
@@ -92,7 +93,8 @@ def get_current_user(
                     detail="Invalid token payload"
                 )
 
-            user = db.query(User).filter(User.id == user_id).first()
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
 
             if not user:
                 raise HTTPException(
@@ -108,9 +110,8 @@ def get_current_user(
             pass
 
         # 2. NextAuth 세션 토큰 검증
-        session = db.query(UserSession).filter(
-            UserSession.session_token == token
-        ).first()
+        result = await db.execute(select(UserSession).where(UserSession.session_token == token))
+        session = result.scalar_one_or_none()
 
         if not session:
             raise HTTPException(
@@ -126,7 +127,8 @@ def get_current_user(
                 detail="Session has expired"
             )
 
-        user = db.query(User).filter(User.id == session.user_id).first()
+        result = await db.execute(select(User).where(User.id == session.user_id))
+        user = result.scalar_one_or_none()
 
         if not user:
             raise HTTPException(
@@ -147,9 +149,9 @@ def get_current_user(
         )
 
 
-def get_optional_user(
+async def get_optional_user(
     authorization: Optional[str] = Header(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
     """
     선택적 사용자 인증 (인증 실패 시 None 반환)
@@ -178,7 +180,7 @@ def get_optional_user(
             credentials=token
         )
 
-        return get_current_user(credentials=credentials, db=db)
+        return await get_current_user(credentials=credentials, db=db)
 
     except HTTPException:
         return None

@@ -141,16 +141,53 @@ class LogoutResponse(BaseModel):
 
 # ==================== Helper Functions ====================
 
-async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
-    """이메일로 사용자 조회"""
-    result = await db.execute(select(User).where(User.email == email))
-    return result.scalar_one_or_none()
+async def db_commit(db):
+    """데이터베이스 커밋 (SQLite/PostgreSQL 호환)"""
+    from app.database.base import is_sqlite
+
+    if is_sqlite:
+        db.commit()
+    else:
+        await db_commit(db)
 
 
-async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
-    """ID로 사용자 조회"""
-    result = await db.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
+async def db_refresh(db, instance):
+    """데이터베이스 객체 새로고침 (SQLite/PostgreSQL 호환)"""
+    from app.database.base import is_sqlite
+
+    if is_sqlite:
+        db.refresh(instance)
+    else:
+        await db.refresh(instance)
+
+
+async def get_user_by_email(db, email: str) -> Optional[User]:
+    """이메일로 사용자 조회 (SQLite/PostgreSQL 호환)"""
+    from app.database.base import is_sqlite
+    from sqlalchemy.orm import Session
+
+    if is_sqlite:
+        # SQLite: 동기 방식
+        result = db.execute(select(User).where(User.email == email))
+        return result.scalar_one_or_none()
+    else:
+        # PostgreSQL: 비동기 방식
+        result = await db.execute(select(User).where(User.email == email))
+        return result.scalar_one_or_none()
+
+
+async def get_user_by_id(db, user_id: str) -> Optional[User]:
+    """ID로 사용자 조회 (SQLite/PostgreSQL 호환)"""
+    from app.database.base import is_sqlite
+
+    if is_sqlite:
+        # SQLite: 동기 방식
+        result = db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
+    else:
+        # PostgreSQL: 비동기 방식
+        result = await db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
 
 
 # ==================== API Endpoints ====================
@@ -193,8 +230,8 @@ async def register(
     )
 
     db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
+    await db_commit(db)
+    await db_refresh(db, new_user)
 
     # JWT 토큰 생성
     access_token = create_access_token(data={"sub": new_user.id, "email": new_user.email})

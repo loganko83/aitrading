@@ -14,7 +14,7 @@ is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 
 if is_sqlite:
     # SQLite: Use synchronous engine
-    logger.info("🗄️ Using SQLite database (synchronous)")
+    logger.info("Using SQLite database (synchronous)")
     database_url = settings.DATABASE_URL
 
     # Create sync engine for SQLite
@@ -36,7 +36,7 @@ if is_sqlite:
 
 else:
     # PostgreSQL: Use async engine
-    logger.info("🗄️ Using PostgreSQL database (asynchronous)")
+    logger.info("Using PostgreSQL database (asynchronous)")
     database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
     # Create async engine
@@ -53,7 +53,7 @@ else:
         expire_on_commit=False
     )
 
-    # For compatibility with code that checks is_sqlite
+    # For compatibility with code that imports SessionLocal
     SessionLocal = None
 
 # Base class for all models
@@ -70,9 +70,9 @@ try:
         slow_query_logger.setup_event_listeners(engine)
     else:
         slow_query_logger.setup_event_listeners(engine.sync_engine)
-    logger.info("✅ Slow Query Logger initialized (threshold: 1.0s)")
+    logger.info("Slow Query Logger initialized (threshold: 1.0s)")
 except Exception as e:
-    logger.warning(f"⚠️ Failed to initialize Slow Query Logger: {e}")
+    logger.warning(f"Failed to initialize Slow Query Logger: {e}")
 
 
 # Dependency for database sessions

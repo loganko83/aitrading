@@ -48,10 +48,10 @@ class RedisClient:
 
                 # 연결 테스트
                 await cls._instance.ping()
-                logger.info("✅ Redis client initialized successfully")
+                logger.info("Redis client initialized successfully")
 
             except Exception as e:
-                logger.error(f"❌ Failed to initialize Redis client: {e}")
+                logger.error(f"Failed to initialize Redis client: {e}")
                 raise
 
         return cls._instance
@@ -267,11 +267,11 @@ class RedisCache:
             key = f"blacklist:{token_type}:{token}"
             await self.set(key, "revoked", ttl=ttl, use_json=False)
 
-            logger.info(f"✅ Token added to blacklist: {token_type} (TTL: {ttl}s)")
+            logger.info(f"Token added to blacklist: {token_type} (TTL: {ttl}s)")
             return True
 
         except Exception as e:
-            logger.error(f"❌ Failed to add token to blacklist: {str(e)}")
+            logger.error(f"Failed to add token to blacklist: {str(e)}")
             return False
 
     async def is_token_blacklisted(self, token: str, token_type: str = "refresh") -> bool:

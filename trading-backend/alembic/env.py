@@ -30,11 +30,11 @@ is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 if is_sqlite:
     # SQLite: Use as-is (synchronous)
     database_url = settings.DATABASE_URL
-    print("🗄️ Alembic: Using SQLite (synchronous migrations)")
+    print("Alembic: Using SQLite (synchronous migrations)")
 else:
     # PostgreSQL: Convert to async driver
     database_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-    print("🗄️ Alembic: Using PostgreSQL (asynchronous migrations)")
+    print("Alembic: Using PostgreSQL (asynchronous migrations)")
 
 config.set_main_option("sqlalchemy.url", database_url)
 

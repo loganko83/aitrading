@@ -74,7 +74,7 @@ class RiskMonitor:
     async def start(self):
         """모니터링 시작"""
         self.is_running = True
-        logger.info("🚀 Risk monitoring service started")
+        logger.info("Risk monitoring service started")
 
         while self.is_running:
             try:
@@ -93,7 +93,7 @@ class RiskMonitor:
     async def stop(self):
         """모니터링 중지"""
         self.is_running = False
-        logger.info("🛑 Risk monitoring service stopped")
+        logger.info("Risk monitoring service stopped")
 
     async def monitor_all_accounts(self):
         """모든 활성 계정 모니터링"""
