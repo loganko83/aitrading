@@ -33,8 +33,10 @@ class BinanceClient:
         # API URLs
         if testnet:
             self.base_url = "https://testnet.binancefuture.com"
+            self.spot_base_url = "https://testnet.binance.vision"
         else:
             self.base_url = "https://fapi.binance.com"
+            self.spot_base_url = "https://api.binance.com"
 
         self.headers = {
             "X-MBX-APIKEY": self.api_key
@@ -56,10 +58,13 @@ class BinanceClient:
         method: str,
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
-        signed: bool = False
+        signed: bool = False,
+        use_spot_url: bool = False  # NEW: Spot/Funding API용
     ) -> Dict[str, Any]:
         """API 요청"""
-        url = f"{self.base_url}{endpoint}"
+        # Spot/Funding API는 spot_base_url 사용
+        base = self.spot_base_url if use_spot_url else self.base_url
+        url = f"{base}{endpoint}"
 
         if params is None:
             params = {}
@@ -87,19 +92,127 @@ class BinanceClient:
             raise
 
     def get_account_balance(self) -> Dict[str, Any]:
-        """계좌 잔액 조회"""
-        result = self._request("GET", "/fapi/v2/balance", signed=True)
+        """
+        계좌 잔액 조회 (ALL Account Types)
 
-        # USDT 잔액만 추출
-        usdt_balance = next(
-            (item for item in result if item["asset"] == "USDT"),
+        Binance 계정 구조:
+        - Futures Account: 선물 거래 계정
+        - Spot Account: 현물 거래 계정
+        - Funding Wallet: 입출금 지갑 (NEW)
+        """
+        # 1. Futures Account 조회
+        futures_balance = self._request("GET", "/fapi/v2/balance", signed=True)
+        futures_usdt = next(
+            (item for item in futures_balance if item["asset"] == "USDT"),
             {"availableBalance": "0", "balance": "0"}
         )
 
+        # 2. Spot Account 조회
+        try:
+            spot_account = self._request("GET", "/api/v3/account", signed=True, use_spot_url=True)
+            spot_balances = spot_account.get("balances", [])
+            spot_usdt = next(
+                (item for item in spot_balances if item["asset"] == "USDT"),
+                {"free": "0", "locked": "0"}
+            )
+            spot_usdt_total = float(spot_usdt["free"]) + float(spot_usdt["locked"])
+        except Exception as e:
+            logger.warning(f"Failed to fetch Spot balance: {e}")
+            spot_usdt = {"free": "0", "locked": "0"}
+            spot_usdt_total = 0.0
+            spot_balances = []
+
+        # 3. Funding Wallet 조회 (NEW)
+        try:
+            funding_assets = self._request("GET", "/sapi/v1/asset/get-funding-asset", signed=True, use_spot_url=True)
+            funding_usdt = next(
+                (item for item in funding_assets if item["asset"] == "USDT"),
+                {"free": "0", "locked": "0", "freeze": "0"}
+            )
+            # Funding Wallet: free + locked + freeze
+            funding_usdt_available = float(funding_usdt.get("free", "0"))
+            funding_usdt_total = (
+                float(funding_usdt.get("free", "0")) +
+                float(funding_usdt.get("locked", "0")) +
+                float(funding_usdt.get("freeze", "0"))
+            )
+        except Exception as e:
+            logger.warning(f"Failed to fetch Funding Wallet balance: {e}")
+            funding_usdt_available = 0.0
+            funding_usdt_total = 0.0
+            funding_assets = []
+
+        # 4. Total USDT across all accounts (Futures + Spot + Funding)
+        total_available = (
+            float(futures_usdt["availableBalance"]) +
+            float(spot_usdt["free"]) +
+            funding_usdt_available
+        )
+        total_balance = (
+            float(futures_usdt["balance"]) +
+            spot_usdt_total +
+            funding_usdt_total
+        )
+
+        # 5. All assets with balance > 0 (Futures)
+        all_futures_assets = [
+            {
+                "asset": item["asset"],
+                "available_balance": float(item["availableBalance"]),
+                "total_balance": float(item["balance"]),
+                "account_type": "futures"
+            }
+            for item in futures_balance
+            if float(item["balance"]) > 0
+        ]
+
+        # 6. All assets with balance > 0 (Spot)
+        all_spot_assets = [
+            {
+                "asset": item["asset"],
+                "available_balance": float(item["free"]),
+                "total_balance": float(item["free"]) + float(item["locked"]),
+                "account_type": "spot"
+            }
+            for item in spot_balances
+            if (float(item["free"]) + float(item["locked"])) > 0
+        ]
+
+        # 7. All assets with balance > 0 (Funding)
+        all_funding_assets = [
+            {
+                "asset": item["asset"],
+                "available_balance": float(item.get("free", "0")),
+                "total_balance": (
+                    float(item.get("free", "0")) +
+                    float(item.get("locked", "0")) +
+                    float(item.get("freeze", "0"))
+                ),
+                "account_type": "funding"
+            }
+            for item in funding_assets
+            if (float(item.get("free", "0")) + float(item.get("locked", "0")) + float(item.get("freeze", "0"))) > 0
+        ]
+
         return {
             "asset": "USDT",
-            "available_balance": float(usdt_balance["availableBalance"]),
-            "total_balance": float(usdt_balance["balance"])
+            "available_balance": str(total_available),
+            "total_balance": str(total_balance),
+            "account_structure": {
+                "futures": {
+                    "usdt_available": float(futures_usdt["availableBalance"]),
+                    "usdt_total": float(futures_usdt["balance"])
+                },
+                "spot": {
+                    "usdt_available": float(spot_usdt["free"]),
+                    "usdt_total": spot_usdt_total
+                },
+                "funding": {  # NEW
+                    "usdt_available": funding_usdt_available,
+                    "usdt_total": funding_usdt_total
+                }
+            },
+            "all_assets": all_futures_assets + all_spot_assets + all_funding_assets
         }
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -434,3 +547,83 @@ class BinanceClient:
                 "valid": False,
                 "message": f"Validation error: {str(e)}"
             }
+
+    def transfer_asset(self, from_account: str, to_account: str, asset: str, amount: float) -> Dict[str, Any]:
+        """
+        계정 간 자산 이동
+
+        Args:
+            from_account: 출금 계정 ('SPOT' or 'FUTURES')
+            to_account: 입금 계정 ('SPOT' or 'FUTURES')
+            asset: 자산 심볼 (e.g., 'USDT')
+            amount: 이동 금액
+
+        Returns:
+            Dict with transfer result:
+            - success: bool
+            - tranId: transfer transaction ID
+            - amount: transferred amount
+            - from_account: source account
+            - to_account: destination account
+
+        Raises:
+            ValueError: Invalid account type or insufficient balance
+            Exception: API call failed
+        """
+        # 계정 타입 매핑
+        transfer_types = {
+            ('SPOT', 'FUTURES'): 'MAIN_UMFUTURE',
+            ('FUTURES', 'SPOT'): 'UMFUTURE_MAIN'
+        }
+
+        transfer_key = (from_account.upper(), to_account.upper())
+        if transfer_key not in transfer_types:
+            raise ValueError(f"Invalid transfer direction: {from_account} -> {to_account}. Only SPOT <-> FUTURES supported.")
+
+        transfer_type = transfer_types[transfer_key]
+
+        # API 호출
+        params = {
+            "type": transfer_type,
+            "asset": asset.upper(),
+            "amount": str(amount)
+        }
+
+        try:
+            result = self._request("POST", "/sapi/v1/asset/transfer", params=params, signed=True)
+
+            logger.info(f"Binance transfer successful: {amount} {asset} from {from_account} to {to_account}")
+
+            return {
+                "success": True,
+                "tranId": result["tranId"],
+                "amount": amount,
+                "asset": asset,
+                "from_account": from_account,
+                "to_account": to_account,
+                "timestamp": result.get("timestamp", int(time.time() * 1000))
+            }
+
+        except requests.exceptions.HTTPError as e:
+            error_msg = f"Binance transfer failed: {str(e)}"
+            logger.error(error_msg)
+
+            # Parse error response
+            try:
+                error_data = e.response.json()
+                error_code = error_data.get("code")
+                error_message = error_data.get("msg", str(e))
+
+                # Common error codes
+                if error_code == -4046:
+                    raise ValueError(f"Insufficient balance in {from_account} account")
+                elif error_code == -1003:
+                    raise ValueError("Transfer amount too small or too large")
+                else:
+                    raise Exception(f"Transfer failed: {error_message}")
+            except:
+                raise Exception(error_msg)
+
+        except Exception as e:
+            logger.error(f"Unexpected transfer error: {str(e)}")
+            raise

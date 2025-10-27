@@ -35,32 +35,22 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+    const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     setError('');
 
-    try {
-      const result = await signIn('credentials', {
-        email: data.email,
-        password: data.password,
-        totp_code: data.totp_code,
-        redirect: false,
-      });
+    const result = await signIn('credentials', {
+      email: data.email,
+      password: data.password,
+      totp_code: data.totp_code,
+      redirect: true,
+      callbackUrl: '/trading/dashboard',
+    });
 
-      if (result?.error) {
-        if (result.error === 'OTP_REQUIRED') {
-          setOtpRequired(true);
-          setError('Please enter your Google Authenticator code');
-        } else {
-          setError(result.error);
-        }
-      } else if (result?.ok) {
-        router.push('/dashboard');
-        router.refresh();
-      }
-    } catch (err) {
-      setError('An unexpected error occurred');
-    } finally {
+    // redirect: true일 때는 성공시 자동 리다이렉트되므로 여기까지 오지 않음
+    // 에러가 있을 경우만 여기 도달
+    if (result?.error) {
+      setError(result.error);
       setIsLoading(false);
     }
   };

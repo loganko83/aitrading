@@ -84,7 +84,7 @@ export default function WebhooksPage() {
   const loadWebhooks = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/webhooks');
+      const res = await fetch('/api/webhooks/');
       const result = await res.json();
 
       if (result.success && result.data) {
@@ -102,7 +102,7 @@ export default function WebhooksPage() {
     setMessage(null);
 
     try {
-      const res = await fetch('/api/webhooks', {
+      const res = await fetch('/api/webhooks/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -111,12 +111,12 @@ export default function WebhooksPage() {
       const result = await res.json();
 
       if (result.success) {
-        setMessage({ type: 'success', text: '웹훅이 생성되었습니다!' });
+        setMessage({ type: 'success', text: 'Webhook created successfully!' });
         setIsDialogOpen(false);
         reset();
         await loadWebhooks();
       } else {
-        setMessage({ type: 'error', text: result.error || '웹훅 생성에 실패했습니다.' });
+        setMessage({ type: 'error', text: result.error || 'Create Webhook에 실패했습니다.' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: '네트워크 오류가 발생했습니다.' });
@@ -126,17 +126,17 @@ export default function WebhooksPage() {
   };
 
   const deleteWebhook = async (webhookId: string) => {
-    if (!confirm('정말 이 웹훅을 삭제하시겠습니까?')) return;
+    if (!confirm('Are you sure you want to delete this webhook?')) return;
 
     try {
-      const res = await fetch(`/api/webhooks?id=${webhookId}`, {
+      const res = await fetch(`/api/webhooks/?id=${webhookId}`, {
         method: 'DELETE',
       });
 
       const result = await res.json();
 
       if (result.success) {
-        setMessage({ type: 'success', text: '웹훅이 삭제되었습니다.' });
+        setMessage({ type: 'success', text: 'Webhook deleted successfully.' });
         await loadWebhooks();
       } else {
         setMessage({ type: 'error', text: result.error || '삭제에 실패했습니다.' });
@@ -150,7 +150,7 @@ export default function WebhooksPage() {
     setIsTesting(webhook.id);
 
     try {
-      const res = await fetch('/api/webhooks/test', {
+      const res = await fetch('/api/webhooks/test/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -162,9 +162,9 @@ export default function WebhooksPage() {
       const result = await res.json();
 
       if (result.success) {
-        setMessage({ type: 'success', text: '테스트 시그널이 전송되었습니다!' });
+        setMessage({ type: 'success', text: 'Test signal sent successfully!' });
       } else {
-        setMessage({ type: 'error', text: '테스트 실패: ' + (result.error || 'Unknown error') });
+        setMessage({ type: 'error', text: 'Test failed: ' + (result.error || 'Unknown error') });
       }
     } catch (error) {
       setMessage({ type: 'error', text: '네트워크 오류가 발생했습니다.' });
@@ -175,7 +175,7 @@ export default function WebhooksPage() {
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    setMessage({ type: 'success', text: `${label}가 클립보드에 복사되었습니다.` });
+    setMessage({ type: 'success', text: `${label}가 copied to clipboard.` });
   };
 
   if (isLoading) {
@@ -190,9 +190,9 @@ export default function WebhooksPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">웹훅 관리</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Webhook Management</h1>
           <p className="text-gray-600 mt-2">
-            TradingView 알림 및 외부 시스템과 연동하세요
+            Connect with TradingView alerts and external systems
           </p>
         </div>
 
@@ -200,12 +200,12 @@ export default function WebhooksPage() {
           <DialogTrigger asChild>
             <Button size="lg">
               <Plus className="w-5 h-5 mr-2" />
-              새 웹훅 생성
+              Create New Webhook
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>웹훅 생성</DialogTitle>
+              <DialogTitle>Create Webhook</DialogTitle>
               <DialogDescription>
                 TradingView 또는 외부 시스템에서 사용할 웹훅을 생성합니다
               </DialogDescription>
@@ -213,7 +213,7 @@ export default function WebhooksPage() {
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <Label htmlFor="name">웹훅 이름 *</Label>
+                <Label htmlFor="name">Webhook Name *</Label>
                 <Input
                   id="name"
                   placeholder="예: TradingView BTC Strategy"
@@ -225,7 +225,7 @@ export default function WebhooksPage() {
               </div>
 
               <div>
-                <Label htmlFor="description">설명 (선택)</Label>
+                <Label htmlFor="description">Description (Optional)</Label>
                 <Textarea
                   id="description"
                   placeholder="웹훅 용도를 설명하세요"
@@ -234,7 +234,7 @@ export default function WebhooksPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <Label htmlFor="is-active">즉시 활성화</Label>
+                <Label htmlFor="is-active">Activate Immediately</Label>
                 <Switch id="is-active" defaultChecked {...register('is_active')} />
               </div>
 
@@ -244,13 +244,13 @@ export default function WebhooksPage() {
                   variant="outline"
                   onClick={() => setIsDialogOpen(false)}
                 >
-                  취소
+                  Cancel
                 </Button>
                 <Button type="submit" disabled={isCreating}>
                   {isCreating ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      생성 중...
+                      Creating...
                     </>
                   ) : (
                     '생성'
@@ -284,14 +284,14 @@ export default function WebhooksPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ExternalLink className="w-5 h-5 text-blue-600" />
-            TradingView 연동 가이드
+            TradingView Integration Guide
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">1. 웹훅 생성</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">1. Create Webhook</h3>
             <p className="text-sm text-gray-700">
-              상단의 "새 웹훅 생성" 버튼을 클릭하여 웹훅을 만드세요.
+              상단의 "Create New Webhook" 버튼을 클릭하여 웹훅을 만드세요.
             </p>
           </div>
 
@@ -330,9 +330,9 @@ export default function WebhooksPage() {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Webhook className="w-16 h-16 text-gray-400 mb-4" />
               <p className="text-gray-600 text-center">
-                아직 생성된 웹훅이 없습니다.
+                No webhooks created yet.
                 <br />
-                새 웹훅을 생성하여 시작하세요.
+                Create a new webhook to get started.
               </p>
             </CardContent>
           </Card>

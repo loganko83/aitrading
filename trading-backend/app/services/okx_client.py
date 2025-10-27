@@ -103,27 +103,88 @@ class OKXClient:
             raise
 
     def get_account_balance(self) -> Dict[str, Any]:
-        """계좌 잔액 조회"""
-        result = self._request("GET", "/api/v5/account/balance")
+        """
+        계좌 잔액 조회 (ALL Account Types)
 
-        if not result:
-            return {
-                "asset": "USDT",
-                "available_balance": 0.0,
-                "total_balance": 0.0
-            }
+        OKX 계정 구조:
+        - Funding Account: 입출금 계정 (Deposit/Withdraw)
+        - Trading Account: 거래 계정 (Futures, Margin, etc)
+        - Note: Spot trading uses Trading Account
+        """
+        # 1. Trading Account 조회
+        trading_result = self._request("GET", "/api/v5/account/balance")
 
-        # USDT 잔액 추출
-        details = result[0].get("details", [])
-        usdt_detail = next(
-            (item for item in details if item["ccy"] == "USDT"),
-            {"availBal": "0", "eq": "0"}
-        )
+        # 2. Funding Account 조회
+        try:
+            funding_result = self._request("GET", "/api/v5/asset/balances")
+        except Exception as e:
+            logger.warning(f"Failed to fetch funding balance: {e}")
+            funding_result = []
+
+        # 3. Trading Account - USDT 잔액 추출
+        trading_usdt = {"availBal": "0", "eq": "0"}
+        if trading_result:
+            details = trading_result[0].get("details", [])
+            trading_usdt = next(
+                (item for item in details if item["ccy"] == "USDT"),
+                trading_usdt
+            )
+
+        # 4. Funding Account - USDT 잔액 추출
+        funding_usdt = {"availBal": "0", "bal": "0"}
+        if funding_result:
+            funding_usdt = next(
+                (item for item in funding_result if item["ccy"] == "USDT"),
+                funding_usdt
+            )
+
+        # 5. Sum both accounts for total balance
+        total_available = float(trading_usdt["availBal"]) + float(funding_usdt["availBal"])
+        total_balance_combined = float(trading_usdt["eq"]) + float(funding_usdt.get("bal", "0"))
+
+        # 6. All assets with balance > 0 (Trading Account)
+        all_trading_assets = []
+        if trading_result:
+            all_trading_assets = [
+                {
+                    "asset": detail["ccy"],
+                    "available_balance": float(detail["availBal"]),
+                    "total_balance": float(detail["eq"]),
+                    "account_type": "trading"
+                }
+                for detail in trading_result[0].get("details", [])
+                if float(detail["eq"]) > 0
+            ]
+
+        # 7. All assets with balance > 0 (Funding Account)
+        all_funding_assets = []
+        if funding_result:
+            all_funding_assets = [
+                {
+                    "asset": item["ccy"],
+                    "available_balance": float(item["availBal"]),
+                    "total_balance": float(item["bal"]),
+                    "account_type": "funding"
+                }
+                for item in funding_result
+                if float(item["bal"]) > 0
+            ]
 
         return {
             "asset": "USDT",
-            "available_balance": float(usdt_detail["availBal"]),
-            "total_balance": float(usdt_detail["eq"])
+            "available_balance": str(total_available),
+            "total_balance": str(total_balance_combined),
+            "account_structure": {
+                "funding": {
+                    "usdt_available": float(funding_usdt["availBal"]),
+                    "usdt_total": float(funding_usdt.get("bal", "0"))
+                },
+                "trading": {
+                    "usdt_available": float(trading_usdt["availBal"]),
+                    "usdt_total": float(trading_usdt["eq"])
+                }
+            },
+            "all_assets": all_trading_assets + all_funding_assets
         }
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -331,6 +392,59 @@ class OKXClient:
             "open_time": int(ticker["ts"]) - (24 * 60 * 60 * 1000),  # 24시간 전
             "close_time": int(ticker["ts"]),
             "count": 0  # OKX는 거래 횟수 제공 안함
+        }
+
+    def transfer_asset(
+        self,
+        currency: str,
+        amount: float,
+        from_account: str,  # "6" (Funding) or "18" (Trading)
+        to_account: str      # "6" (Funding) or "18" (Trading)
+    ) -> Dict[str, Any]:
+        """
+        계정 간 자산 이동 (Funding ↔ Trading)
+
+        OKX 계정 타입 코드:
+        - "6": Funding account (입출금 계정)
+        - "18": Trading account (거래 계정)
+
+        Args:
+            currency: 자산 코드 (e.g., "USDT", "BTC")
+            amount: 이동할 수량
+            from_account: 출금 계정 ("6" or "18")
+            to_account: 입금 계정 ("6" or "18")
+
+        Returns:
+            이동 결과
+        """
+        body = {
+            "ccy": currency,
+            "amt": str(amount),
+            "from": from_account,
+            "to": to_account,
+            "type": "0"  # Internal transfer
+        }
+
+        result = self._request("POST", "/api/v5/asset/transfer", body=body)
+
+        if not result:
+            raise Exception("Transfer failed")
+
+        transfer_data = result[0]
+
+        logger.info(
+            f"Asset transferred: {amount} {currency} from {from_account} to {to_account} "
+            f"(transId: {transfer_data.get('transId', 'N/A')})"
+        )
+
+        return {
+            "success": True,
+            "transfer_id": transfer_data.get("transId"),
+            "currency": currency,
+            "amount": amount,
+            "from_account": "funding" if from_account == "6" else "trading",
+            "to_account": "funding" if to_account == "6" else "trading",
+            "message": f"Transferred {amount} {currency}"
         }
 
     def validate_credentials(self) -> Dict[str, Any]:

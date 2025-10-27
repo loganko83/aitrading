@@ -80,6 +80,7 @@ async def get_current_user(
         HTTPException: 인증 실패 시
     """
     token = credentials.credentials
+    logger.info(f"DEBUG get_current_user: Using session {id(db)} to fetch user")
 
     try:
         # 1. JWT 토큰 검증 시도
@@ -186,3 +187,7 @@ async def get_optional_user(
         return None
     except Exception:
         return None
+
+
+# Alias for backward compatibility
+get_current_user_optional = get_optional_user

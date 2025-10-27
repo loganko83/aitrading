@@ -1,226 +1,184 @@
 """
-Telegram Notification API
-
-Features:
-- 텔레그램 채팅 ID 등록
-- 알림 설정 관리
-- 테스트 알림 전송
+Telegram Configuration API
+사용자의 Telegram Bot 설정 관리 (암호화)
 """
-
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from pydantic import BaseModel
 from typing import Optional
-from sqlalchemy.orm import Session
 import logging
 
-from app.services.telegram_service import telegram_service
-from app.models.user import User
-from app.models.api_key import ApiKey
 from app.core.auth import get_current_user
-from app.database.session import get_db
+from app.database.base import get_db
+from app.models.user import User
+from app.models.telegram_config import TelegramConfig
+from app.core.crypto import crypto_service
 
+router = APIRouter(prefix="/telegram", tags=["Telegram"])
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/telegram", tags=["telegram"])
+
+# ==================== Request/Response Models ====================
+
+class TelegramConfigCreate(BaseModel):
+    bot_token: str
+    chat_id: str
+    notify_entry: bool = True
+    notify_exit: bool = True
+    notify_stop_loss: bool = True
+    notify_take_profit: bool = True
 
 
-class TelegramRegister(BaseModel):
-    """텔레그램 채팅 ID 등록"""
-    telegram_chat_id: str = Field(..., description="텔레그램 채팅 ID", min_length=1, max_length=50)
-
-
-class TelegramSettings(BaseModel):
-    """텔레그램 설정 응답"""
-    user_id: str
-    telegram_chat_id: str
+class TelegramConfigResponse(BaseModel):
+    id: str
     is_active: bool
+    notify_entry: bool
+    notify_exit: bool
+    notify_stop_loss: bool
+    notify_take_profit: bool
+    created_at: str
+    
+    class Config:
+        from_attributes = True
 
 
-def get_telegram_chat_id(account_id: str, db: Session = None) -> Optional[str]:
-    """
-    계정 ID로 텔레그램 채팅 ID 조회 (유틸리티 함수)
+# ==================== API Endpoints ====================
 
-    Args:
-        account_id: ApiKey ID
-        db: Database session (optional, creates new session if not provided)
-
-    Returns:
-        Telegram chat ID or None if not configured
-    """
-    from app.database.session import SessionLocal
-
-    # Create session if not provided
-    if db is None:
-        db = SessionLocal()
-        should_close = True
-    else:
-        should_close = False
-
-    try:
-        # Query ApiKey by ID
-        api_key = db.query(ApiKey).filter(ApiKey.id == account_id).first()
-
-        if not api_key:
-            logger.warning(f"ApiKey not found: {account_id}")
-            return None
-
-        # Get associated User
-        user = db.query(User).filter(User.id == api_key.user_id).first()
-
-        if not user:
-            logger.warning(f"User not found for ApiKey: {account_id}")
-            return None
-
-        # Return telegram_chat_id (may be None)
-        return user.telegram_chat_id
-
-    except Exception as e:
-        logger.error(f"Error getting telegram_chat_id for account {account_id}: {str(e)}")
-        return None
-
-    finally:
-        if should_close:
-            db.close()
-
-
-@router.post("/register", response_model=TelegramSettings)
+@router.post("/register")
 async def register_telegram(
-    telegram: TelegramRegister,
+    data: TelegramConfigCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    텔레그램 채팅 ID 등록
-
-    **텔레그램 채팅 ID 찾기**:
-    1. 텔레그램 봇과 대화 시작 (/start)
-    2. @userinfobot에게 메시지 전송
-    3. 봇이 응답한 ID를 복사
-
-    또는 curl로 확인:
-    ```bash
-    curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
-    ```
-
-    **주의**:
-    - 반드시 봇과 먼저 대화를 시작해야 알림을 받을 수 있습니다!
-    - /start 명령어를 봇에게 보내세요
+    Telegram Bot 설정 등록
+    
+    **보안:**
+    - bot_token과 chat_id는 AES-256으로 암호화되어 저장됨
     """
     try:
-        logger.info(f"Registering Telegram for user: {current_user.id}")
-
-        # 텔레그램 봇 설정 확인
-        if not telegram_service.is_configured():
-            raise HTTPException(
-                status_code=503,
-                detail="Telegram bot not configured. Please set TELEGRAM_BOT_TOKEN in .env"
-            )
-
-        # 채팅 ID 유효성 검증 (테스트 메시지 전송)
-        is_valid = telegram_service.verify_chat_id(telegram.telegram_chat_id)
-
-        if not is_valid:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid Telegram chat ID or bot cannot send message to this user. "
-                       "Make sure you've started a conversation with the bot (/start)"
-            )
-
-        # DB에 저장
-        current_user.telegram_chat_id = telegram.telegram_chat_id
-        db.commit()
-        db.refresh(current_user)
-
-        logger.info(f"Telegram registered successfully: {current_user.id} -> {telegram.telegram_chat_id}")
-
-        return TelegramSettings(
-            user_id=current_user.id,
-            telegram_chat_id=telegram.telegram_chat_id,
-            is_active=True
+        # 기존 설정 확인
+        result = await db.execute(
+            select(TelegramConfig).where(TelegramConfig.user_id == current_user.id)
         )
-
-    except HTTPException:
-        raise
+        existing = result.scalar_one_or_none()
+        
+        # Telegram API 키 암호화
+        encrypted = crypto_service.encrypt_api_credentials({
+            "api_key": data.bot_token,
+            "api_secret": data.chat_id,
+            "passphrase": None
+        })
+        
+        if existing:
+            # Update
+            existing.bot_token = encrypted["api_key"]
+            existing.chat_id = encrypted["api_secret"]
+            existing.notify_entry = data.notify_entry
+            existing.notify_exit = data.notify_exit
+            existing.notify_stop_loss = data.notify_stop_loss
+            existing.notify_take_profit = data.notify_take_profit
+            existing.is_active = True
+            
+            telegram_config = existing
+        else:
+            # Create new
+            telegram_config = TelegramConfig(
+                user_id=current_user.id,
+                bot_token=encrypted["api_key"],
+                chat_id=encrypted["api_secret"],
+                notify_entry=data.notify_entry,
+                notify_exit=data.notify_exit,
+                notify_stop_loss=data.notify_stop_loss,
+                notify_take_profit=data.notify_take_profit
+            )
+            db.add(telegram_config)
+        
+        await db.commit()
+        await db.refresh(telegram_config)
+        
+        return {
+            "id": telegram_config.id,
+            "is_active": telegram_config.is_active,
+            "message": "Telegram configuration saved successfully"
+        }
+        
     except Exception as e:
-        logger.error(f"Failed to register Telegram: {str(e)}", exc_info=True)
-        db.rollback()
+        logger.error(f"Failed to register Telegram config: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/settings", response_model=TelegramSettings)
-async def get_telegram_settings(
-    current_user: User = Depends(get_current_user)
-):
-    """
-    텔레그램 설정 조회
-    """
-    if not current_user.telegram_chat_id:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Telegram not configured for user: {current_user.id}"
-        )
-
-    return TelegramSettings(
-        user_id=current_user.id,
-        telegram_chat_id=current_user.telegram_chat_id,
-        is_active=True
-    )
-
-
-@router.delete("/settings")
-async def delete_telegram_settings(
+@router.get("/config")
+async def get_telegram_config(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    텔레그램 설정 삭제
+    사용자의 Telegram 설정 조회
     """
-    if not current_user.telegram_chat_id:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Telegram not configured for user: {current_user.id}"
-        )
-
-    current_user.telegram_chat_id = None
-    db.commit()
-
-    logger.info(f"Telegram settings deleted for user: {current_user.id}")
-
-    return {
-        "success": True,
-        "message": f"Telegram settings deleted for user: {current_user.id}"
-    }
-
-
-@router.post("/test", response_model=dict)
-async def send_test_notification(
-    current_user: User = Depends(get_current_user)
-):
-    """
-    테스트 알림 전송
-
-    등록된 텔레그램으로 테스트 메시지를 전송합니다.
-    """
-    if not current_user.telegram_chat_id:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Telegram not configured for user: {current_user.id}"
-        )
-
-    # 테스트 주문 알림 전송
-    telegram_service.send_order_notification(
-        chat_id=current_user.telegram_chat_id,
-        exchange="binance",
-        action="long",
-        symbol="BTCUSDT",
-        price=67500.0,
-        quantity=0.01,
-        leverage=3,
-        order_id="TEST_ORDER_123"
+    result = await db.execute(
+        select(TelegramConfig).where(TelegramConfig.user_id == current_user.id)
     )
-
+    config = result.scalar_one_or_none()
+    
+    if not config:
+        raise HTTPException(status_code=404, detail="Telegram not configured")
+    
     return {
-        "success": True,
-        "message": "Test notification sent successfully",
-        "chat_id": current_user.telegram_chat_id
+        "id": config.id,
+        "is_active": config.is_active,
+        "notify_entry": config.notify_entry,
+        "notify_exit": config.notify_exit,
+        "notify_stop_loss": config.notify_stop_loss,
+        "notify_take_profit": config.notify_take_profit,
+        "created_at": config.created_at.isoformat()
     }
+
+
+@router.post("/toggle")
+async def toggle_telegram(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Telegram 알림 활성화/비활성화
+    """
+    result = await db.execute(
+        select(TelegramConfig).where(TelegramConfig.user_id == current_user.id)
+    )
+    config = result.scalar_one_or_none()
+    
+    if not config:
+        raise HTTPException(status_code=404, detail="Telegram not configured")
+    
+    config.is_active = not config.is_active
+    await db.commit()
+    
+    return {
+        "id": config.id,
+        "is_active": config.is_active,
+        "message": f"Telegram notifications {'enabled' if config.is_active else 'disabled'}"
+    }
+
+
+@router.delete("/delete")
+async def delete_telegram_config(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Telegram 설정 삭제
+    """
+    result = await db.execute(
+        select(TelegramConfig).where(TelegramConfig.user_id == current_user.id)
+    )
+    config = result.scalar_one_or_none()
+    
+    if not config:
+        raise HTTPException(status_code=404, detail="Telegram not configured")
+    
+    await db.delete(config)
+    await db.commit()
+    
+    return {"success": True, "message": "Telegram configuration deleted"}

@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Set, Union
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.crypto import crypto_service
 from app.services.telegram_service import TelegramService
 from app.services.binance_client import BinanceClient
 from app.services.okx_client import OKXClient
@@ -59,7 +60,7 @@ class RiskMonitor:
     """리스크 모니터링 서비스"""
 
     def __init__(self):
-        self.telegram = TelegramService()
+        self.telegram = None  # TelegramService() - Disabled to prevent crashes
         self.config = RiskMonitorConfig()
 
         # 마지막 알림 시간 추적 (중복 방지)
@@ -141,18 +142,25 @@ class RiskMonitor:
     async def monitor_account(self, api_key: ApiKey, db: Union[Session, AsyncSession]):
         """개별 계정 모니터링"""
 
+        # API 키 복호화
+        decrypted = crypto_service.decrypt_api_credentials({
+            "api_key": api_key.api_key,
+            "api_secret": api_key.api_secret,
+            "passphrase": api_key.passphrase
+        })
+
         # 거래소 클라이언트 생성
         if api_key.exchange == "binance":
             client = BinanceClient(
-                api_key=api_key.api_key,
-                api_secret=api_key.api_secret,
+                api_key=decrypted["api_key"],
+                api_secret=decrypted["api_secret"],
                 testnet=api_key.testnet
             )
         elif api_key.exchange == "okx":
             client = OKXClient(
-                api_key=api_key.api_key,
-                api_secret=api_key.api_secret,
-                passphrase=api_key.passphrase,
+                api_key=decrypted["api_key"],
+                api_secret=decrypted["api_secret"],
+                passphrase=decrypted["passphrase"],
                 testnet=api_key.testnet
             )
         else:
@@ -475,18 +483,25 @@ class RiskMonitor:
     async def send_account_daily_report(self, api_key: ApiKey, db: Union[Session, AsyncSession]):
         """개별 계정 일일 리포트"""
 
+        # API 키 복호화
+        decrypted = crypto_service.decrypt_api_credentials({
+            "api_key": api_key.api_key,
+            "api_secret": api_key.api_secret,
+            "passphrase": api_key.passphrase
+        })
+
         # 거래소 클라이언트 생성
         if api_key.exchange == "binance":
             client = BinanceClient(
-                api_key=api_key.api_key,
-                api_secret=api_key.api_secret,
+                api_key=decrypted["api_key"],
+                api_secret=decrypted["api_secret"],
                 testnet=api_key.testnet
             )
         elif api_key.exchange == "okx":
             client = OKXClient(
-                api_key=api_key.api_key,
-                api_secret=api_key.api_secret,
-                passphrase=api_key.passphrase,
+                api_key=decrypted["api_key"],
+                api_secret=decrypted["api_secret"],
+                passphrase=decrypted["passphrase"],
                 testnet=api_key.testnet
             )
         else:

@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt';
 
 export async function middleware(request: NextRequest) {
   const token = await getToken({
+    cookieName: "__Secure-authjs.session-token",
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
@@ -19,11 +20,15 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/webhooks');
 
   if (isProtectedPage && !token) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
   }
 
   if (isAuthPage && token) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    const dashboardUrl = request.nextUrl.clone();
+    dashboardUrl.pathname = '/dashboard';
+    return NextResponse.redirect(dashboardUrl);
   }
 
   return NextResponse.next();

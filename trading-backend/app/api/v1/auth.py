@@ -148,7 +148,7 @@ async def db_commit(db):
     if is_sqlite:
         db.commit()
     else:
-        await db_commit(db)
+        await db.commit()
 
 
 async def db_refresh(db, instance):

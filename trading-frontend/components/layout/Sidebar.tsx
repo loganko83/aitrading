@@ -29,7 +29,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/' });
+    await signOut({ callbackUrl: '/trading/login' });
   };
 
   return (

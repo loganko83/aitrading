@@ -96,11 +96,17 @@ async def get_db():
     else:
         # PostgreSQL: Use async session
         async with AsyncSessionLocal() as session:
+            session_id = id(session)  # Track session ID
             try:
+                logger.info(f"DEBUG get_db(): Created session {session_id}")
                 yield session
+                logger.info(f"DEBUG get_db(): About to commit session {session_id}")
                 await session.commit()
-            except Exception:
+                logger.info(f"DEBUG get_db(): Session {session_id} committed successfully")
+            except Exception as e:
+                logger.error(f"DEBUG get_db(): Exception in session {session_id}, rolling back: {e}", exc_info=True)
                 await session.rollback()
                 raise
             finally:
+                logger.info(f"DEBUG get_db(): Closing session {session_id}")
                 await session.close()

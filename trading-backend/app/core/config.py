@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
     WEBHOOK_SECRET: str  # TradingView webhook verification key
     ENCRYPTION_KEY: Optional[str] = None  # API key encryption (Fernet key)
     ENCRYPTION_SALT: Optional[str] = None  # Salt for key derivation (base64-encoded)

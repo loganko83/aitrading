@@ -227,7 +227,7 @@ async def shutdown_event():
 
 
 # Import and include API routers
-from app.api.v1 import trading, websocket as ws_router, strategies, backtest, simple, health, performance, optimize, webhook, accounts, accounts_secure, telegram, pine_script, symbols, market, positions, portfolio, ai_prediction, signal, auth
+from app.api.v1 import trading, websocket as ws_router, strategies, backtest, simple, health, performance, optimize, webhook, accounts, accounts_secure, telegram, pine_script, symbols, market, positions, portfolio, ai_prediction, signal, auth, wallet_transfer, trading_config, leaderboard, copy_trading, referral
 
 # Health monitoring (system stability status)
 app.include_router(
@@ -292,6 +292,34 @@ app.include_router(
     tags=["📱 Telegram Notifications"]
 )
 
+# Wallet Transfer API (Account Asset Movement)
+app.include_router(
+    wallet_transfer.router,
+    prefix=f"{settings.API_V1_PREFIX}/wallet",
+    tags=["💰 Wallet Transfer"]
+)
+# Trading Config API (Bot Configuration)
+app.include_router(
+    trading_config.router,
+    prefix=f"{settings.API_V1_PREFIX}/trading-config",
+    tags=["⚙️ Trading Config"]
+)
+# WAVE Features: Leaderboard, Copy Trading, Referral
+app.include_router(
+    leaderboard.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["🏆 Leaderboard"]
+)
+app.include_router(
+    copy_trading.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["📋 Copy Trading"]
+)
+app.include_router(
+    referral.router,
+    prefix=f"{settings.API_V1_PREFIX}",
+    tags=["🎁 Referral System"]
+)
 # Pine Script Strategy Management API
 app.include_router(
     pine_script.router,

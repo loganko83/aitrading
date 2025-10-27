@@ -102,9 +102,9 @@ export default function LeaderboardPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">리더보드</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Leaderboard</h1>
         <p className="text-gray-600 mt-2">
-          전체 트레이더들의 실적을 비교하고 순위를 확인하세요
+          Compare your performance with other traders and check your ranking
         </p>
       </div>
 
@@ -114,34 +114,34 @@ export default function LeaderboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-blue-600" />
-              내 순위
+              My Rank
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div>
-                <div className="text-sm text-gray-600">순위</div>
+                <div className="text-sm text-gray-600">Rank</div>
                 <div className="text-2xl font-bold text-blue-600">#{currentUser.rank}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">레벨</div>
+                <div className="text-sm text-gray-600">Level</div>
                 <div className="text-2xl font-bold text-indigo-600">Lv.{currentUser.level}</div>
                 <div className="text-xs text-gray-500">{getLevelTitle(currentUser.level)}</div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">총 수익</div>
+                <div className="text-sm text-gray-600">Total Profit</div>
                 <div className={`text-2xl font-bold ${currentUser.total_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   ${currentUser.total_pnl.toLocaleString()}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">승률</div>
+                <div className="text-sm text-gray-600">Win Rate</div>
                 <div className="text-2xl font-bold text-purple-600">
                   {currentUser.win_rate.toFixed(1)}%
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">경험치</div>
+                <div className="text-sm text-gray-600">Experience</div>
                 <div className="text-2xl font-bold text-orange-600">
                   {formatNumber(currentUser.xp_points)} XP
                 </div>
@@ -149,7 +149,7 @@ export default function LeaderboardPage() {
             </div>
             {currentUser.badges.length > 0 && (
               <div className="mt-4">
-                <div className="text-sm text-gray-600 mb-2">획득 배지</div>
+                <div className="text-sm text-gray-600 mb-2">Earned Badges</div>
                 <div className="flex flex-wrap gap-2">
                   {currentUser.badges.slice(0, 5).map((badge) => (
                     <Badge key={badge.id} variant="secondary" className="text-lg">
@@ -169,9 +169,9 @@ export default function LeaderboardPage() {
       {/* Leaderboard Table */}
       <Card>
         <CardHeader>
-          <CardTitle>전체 순위</CardTitle>
+          <CardTitle>전체 Rank</CardTitle>
           <CardDescription>
-            상위 트레이더들과 실적을 비교해보세요
+            Compare your performance with top traders
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -179,8 +179,8 @@ export default function LeaderboardPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-20">순위</TableHead>
-                  <TableHead>트레이더</TableHead>
+                  <TableHead className="w-20">Rank</TableHead>
+                  <TableHead>Trader</TableHead>
                   <TableHead>
                     <Button
                       variant="ghost"
@@ -188,7 +188,7 @@ export default function LeaderboardPage() {
                       onClick={() => handleSort('xp_points')}
                       className="font-semibold"
                     >
-                      레벨 & XP
+                      Level & XP
                       <ArrowUpDown className="ml-2 w-4 h-4" />
                     </Button>
                   </TableHead>
@@ -199,7 +199,7 @@ export default function LeaderboardPage() {
                       onClick={() => handleSort('total_pnl')}
                       className="font-semibold"
                     >
-                      총 수익
+                      Total Profit
                       <ArrowUpDown className="ml-2 w-4 h-4" />
                     </Button>
                   </TableHead>
@@ -210,7 +210,7 @@ export default function LeaderboardPage() {
                       onClick={() => handleSort('win_rate')}
                       className="font-semibold"
                     >
-                      승률
+                      Win Rate
                       <ArrowUpDown className="ml-2 w-4 h-4" />
                     </Button>
                   </TableHead>
@@ -221,11 +221,11 @@ export default function LeaderboardPage() {
                       onClick={() => handleSort('total_trades')}
                       className="font-semibold"
                     >
-                      총 거래
+                      Total Trades
                       <ArrowUpDown className="ml-2 w-4 h-4" />
                     </Button>
                   </TableHead>
-                  <TableHead>배지</TableHead>
+                  <TableHead>Badges</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -337,7 +337,7 @@ export default function LeaderboardPage() {
           {/* Pagination */}
           <div className="flex items-center justify-between mt-6">
             <div className="text-sm text-gray-600">
-              페이지 {page} / {totalPages}
+              Page {page} / {totalPages}
             </div>
             <div className="flex gap-2">
               <Button
@@ -347,7 +347,7 @@ export default function LeaderboardPage() {
                 disabled={page === 1}
               >
                 <ChevronLeft className="w-4 h-4" />
-                이전
+                Previous
               </Button>
               <Button
                 variant="outline"
@@ -355,7 +355,7 @@ export default function LeaderboardPage() {
                 onClick={() => setPage(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
               >
-                다음
+                Next
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>

@@ -178,10 +178,14 @@ class CryptoService:
             "api_secret": self.decrypt(encrypted_credentials["api_secret"])
         }
 
-        if "passphrase" in encrypted_credentials:
+        # passphrase가 있고 비어있지 않은 경우에만 복호화
+        if "passphrase" in encrypted_credentials and encrypted_credentials["passphrase"]:
             decrypted_credentials["passphrase"] = self.decrypt(
                 encrypted_credentials["passphrase"]
             )
+        else:
+            # Binance는 passphrase가 없으므로 None 반환
+            decrypted_credentials["passphrase"] = None
 
         logger.info("API credentials decrypted successfully")
         return decrypted_credentials

@@ -4,6 +4,9 @@
  * Centralized HTTP client for calling FastAPI backend
  */
 
+// Use Next.js API routes for proxying to backend
+// This allows NextAuth session tokens to work properly
+const API_PREFIX = '/trading/api';
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8001';
 
 export interface ApiResponse<T = any> {
@@ -25,15 +28,40 @@ export class ApiError extends Error {
 }
 
 /**
+ * Determine if we're running on server side
+ */
+function isServer() {
+  return typeof window === 'undefined';
+}
+
+/**
+ * Build URL for API request
+ * - Client-side: Use Next.js API proxy routes (/api/*)
+ * - Server-side: Use backend URL directly (for NextAuth authorize)
+ */
+function buildUrl(endpoint: string): string {
+  // If endpoint is already a full URL, use it as-is
+  if (endpoint.startsWith('http')) {
+    return endpoint;
+  }
+
+  // Server-side (e.g., NextAuth authorize): call backend directly
+  if (isServer()) {
+    return `${BACKEND_URL}/api/v1${endpoint}`;
+  }
+
+  // Client-side: use Next.js API proxy
+  return `${API_PREFIX}${endpoint}`;
+}
+
+/**
  * Generic API request function
  */
 async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = endpoint.startsWith('http')
-    ? endpoint
-    : `${BACKEND_URL}/api/v1${endpoint}`;
+  const url = buildUrl(endpoint);
 
   const defaultHeaders = {
     'Content-Type': 'application/json',

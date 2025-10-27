@@ -577,6 +577,9 @@ async def get_account_balance(
             "passphrase": api_key_record.passphrase
         })
 
+        # DEBUG: Log decrypted values (first 10 chars only)
+        logger.info(f"Balance endpoint decrypted: api_key={decrypted['api_key'][:10]}..., secret={decrypted['api_secret'][:10]}..., pass={decrypted.get('passphrase', 'None')[:5] if decrypted.get('passphrase') else 'None'}...")
+
         # 거래소 클라이언트 생성 및 잔액 조회
         if api_key_record.exchange == "binance":
             client = BinanceClient(
@@ -596,6 +599,9 @@ async def get_account_balance(
 
         # 잔액 조회
         balance = client.get_account_balance()
+
+        # DEBUG: Log actual balance values
+        logger.info(f"Balance returned from {api_key_record.exchange}: {balance}")
 
         return {
             "account_id": account_id,
@@ -652,6 +658,9 @@ async def get_account_positions(
             "passphrase": api_key_record.passphrase
         })
 
+        # DEBUG: Log decrypted values (first 10 chars only)
+        logger.info(f"Positions endpoint decrypted: api_key={decrypted['api_key'][:10]}..., secret={decrypted['api_secret'][:10]}..., pass={decrypted.get('passphrase', 'None')[:5] if decrypted.get('passphrase') else 'None'}...")
+
         # 거래소 클라이언트 생성 및 포지션 조회
         if api_key_record.exchange == "binance":
             client = BinanceClient(
@@ -684,4 +693,140 @@ async def get_account_positions(
         raise
     except Exception as e:
         logger.error(f"Failed to get positions: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class WalletTransferRequest(BaseModel):
+    """자산 이동 요청"""
+    currency: str = Field(..., description="자산 코드 (e.g., USDT, BTC)")
+    amount: float = Field(..., gt=0, description="이동할 수량")
+    from_account: str = Field(..., description="출금 계정 (funding or trading)")
+    to_account: str = Field(..., description="입금 계정 (funding or trading)")
+
+
+@router.post("/{account_id}/transfer")
+async def transfer_wallet_assets(
+    request: Request,
+    account_id: str,
+    transfer_request: WalletTransferRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(csrf_protect)
+):
+    """
+    지갑 간 자산 이동 (OKX만 지원)
+
+    **보안:**
+    - 사용자 인증 필수
+    - CSRF 토큰 검증 필수
+    - 사용자 본인의 계정만 사용 가능
+
+    **OKX 계정 타입:**
+    - funding: Funding Account (입출금 계정)
+    - trading: Trading Account (거래 계정)
+
+    **예시:**
+    - Funding → Trading: 거래를 위해 자금 이동
+    - Trading → Funding: 출금을 위해 자금 이동
+
+    **참고:**
+    - 현재 OKX 거래소만 지원됩니다
+    - Binance는 자동으로 자금이 할당되므로 수동 이동 불필요
+    """
+    try:
+        # 계정 조회
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.id == account_id,
+                ApiKey.user_id == current_user.id
+            )
+        )
+        api_key_record = result.scalar_one_or_none()
+
+        if not api_key_record:
+            raise HTTPException(status_code=404, detail="Account not found")
+
+        # OKX만 지원
+        if api_key_record.exchange != "okx":
+            raise HTTPException(
+                status_code=400,
+                detail="Wallet transfer is only supported for OKX exchange. Binance automatically allocates funds."
+            )
+
+        # from_account, to_account 검증
+        valid_accounts = ["funding", "trading"]
+        if transfer_request.from_account not in valid_accounts:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid from_account: {transfer_request.from_account}. Must be 'funding' or 'trading'"
+            )
+        if transfer_request.to_account not in valid_accounts:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid to_account: {transfer_request.to_account}. Must be 'funding' or 'trading'"
+            )
+
+        # 동일 계정 간 이동 방지
+        if transfer_request.from_account == transfer_request.to_account:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot transfer to the same account type"
+            )
+
+        # API 키 복호화
+        decrypted = crypto_service.decrypt_api_credentials({
+            "api_key": api_key_record.api_key,
+            "api_secret": api_key_record.api_secret,
+            "passphrase": api_key_record.passphrase
+        })
+
+        logger.info(
+            f"User {current_user.email} initiating transfer: "
+            f"{transfer_request.amount} {transfer_request.currency} "
+            f"from {transfer_request.from_account} to {transfer_request.to_account}"
+        )
+
+        # OKX 클라이언트 생성
+        client = OKXClient(
+            api_key=decrypted["api_key"],
+            api_secret=decrypted["api_secret"],
+            passphrase=decrypted["passphrase"],
+            testnet=api_key_record.testnet
+        )
+
+        # OKX 계정 타입 코드 변환
+        # funding = "6", trading = "18"
+        account_type_map = {
+            "funding": "6",
+            "trading": "18"
+        }
+
+        from_code = account_type_map[transfer_request.from_account]
+        to_code = account_type_map[transfer_request.to_account]
+
+        # 자산 이동 실행
+        transfer_result = client.transfer_asset(
+            currency=transfer_request.currency,
+            amount=transfer_request.amount,
+            from_account=from_code,
+            to_account=to_code
+        )
+
+        logger.info(
+            f"Transfer successful: {transfer_request.amount} {transfer_request.currency} "
+            f"from {transfer_request.from_account} to {transfer_request.to_account}. "
+            f"TransID: {transfer_result.get('transfer_id', 'N/A')}"
+        )
+
+        return {
+            "account_id": account_id,
+            "exchange": api_key_record.exchange,
+            "testnet": api_key_record.testnet,
+            **transfer_result
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to transfer assets: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

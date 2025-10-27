@@ -48,6 +48,11 @@ class User(Base):
     webhooks = relationship("Webhook", back_populates="user", cascade="all, delete-orphan")
     xp_transactions = relationship("XpTransaction", back_populates="user", cascade="all, delete-orphan")
     strategy_configs = relationship("StrategyConfig", back_populates="user", cascade="all, delete-orphan")
+    trading_configs = relationship("TradingConfig", back_populates="user", cascade="all, delete-orphan")
+    leaderboard_entries = relationship("LeaderboardEntry", back_populates="user", cascade="all, delete-orphan")
+    leaderboard_badges = relationship("LeaderboardBadge", back_populates="user", cascade="all, delete-orphan")
+    referral_code = relationship("ReferralCode", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    badges = relationship("LeaderboardBadge", back_populates="user", foreign_keys="LeaderboardBadge.user_id")
 
 
 class Account(Base):

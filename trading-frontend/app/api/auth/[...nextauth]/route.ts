@@ -56,7 +56,8 @@ export const authOptions: NextAuthConfig = {
           const response = await backendLogin({
             email: credentials.email as string,
             password: credentials.password as string,
-            totp_code: credentials.totp_code as string | undefined,
+            // Only include totp_code if it's a non-empty string
+            totp_code: credentials.totp_code && credentials.totp_code !== 'undefined' ? (credentials.totp_code as string) : undefined,
           });
 
           // Check if 2FA is required
@@ -88,9 +89,9 @@ export const authOptions: NextAuthConfig = {
     }),
   ],
   pages: {
-    signIn: '/login',
-    signOut: '/login',
-    error: '/login',
+    signIn: '/trading/login',
+    signOut: '/trading/login',
+    error: '/trading/login',
   },
   callbacks: {
     async jwt({ token, user }) {

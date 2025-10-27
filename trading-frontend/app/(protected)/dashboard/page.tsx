@@ -16,7 +16,7 @@ import {
   AlertCircle,
   TrendingDown,
   DollarSign,
-} from 'lucide-react';
+Activity, ExternalLink } from 'lucide-react';
 import {
   getAccountList,
   getAccountBalance,
@@ -24,6 +24,7 @@ import {
   type Position,
   type AccountBalanceResponse,
 } from '@/lib/api/accounts';
+import { TransferModal } from '@/app/components/modals/TransferModal';
 
 interface DashboardStats {
   total_balance: number;
@@ -38,9 +39,14 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [accounts, setAccounts] = useState<string[]>([]);
+  const [accountBalances, setAccountBalances] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [selectedTransferAccount, setSelectedTransferAccount] = useState<any>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(true);
 
   const loadDashboardData = async () => {
     if (!session?.user?.accessToken) {
@@ -120,6 +126,13 @@ export default function DashboardPage() {
       });
 
       setPositions(allPositions);
+      
+      // Store detailed account balances
+      const accountBalancesWithInfo = accountsData.accounts.map((acc, index) => ({
+        ...acc,
+        balance: balances[index]
+      })).filter(item => item.balance !== null);
+      setAccountBalances(accountBalancesWithInfo);
       setAccounts(accountsData.accounts.map(acc => `${acc.exchange.toUpperCase()} (${acc.testnet ? 'Testnet' : 'Mainnet'})`));
 
     } catch (err: any) {
@@ -128,12 +141,22 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      setLastUpdated(new Date());
     }
   };
 
   useEffect(() => {
     loadDashboardData();
-  }, [session]);
+
+    // Auto-refresh every 30 seconds if enabled
+    if (isAutoRefreshEnabled) {
+      const interval = setInterval(() => {
+        loadDashboardData();
+      }, 30000);
+
+      return () => clearInterval(interval);
+    }
+  }, [session, isAutoRefreshEnabled]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -159,15 +182,33 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">
             Monitor your positions and track your performance
           </p>
+          {lastUpdated && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+              {isAutoRefreshEnabled && (
+                <span className="ml-2 text-green-600">● Auto-refreshing every 30s</span>
+              )}
+            </p>
+          )}
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant={isAutoRefreshEnabled ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsAutoRefreshEnabled(!isAutoRefreshEnabled)}
+          >
+            {isAutoRefreshEnabled ? <Pause className="h-3 w-3 mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+            {isAutoRefreshEnabled ? 'Auto' : 'Manual'}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -308,7 +349,85 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Connected Accounts */}
+      {/* Account Balances by Type */}
+      {accountBalances.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Balances</CardTitle>
+            <CardDescription>Detailed balance breakdown by exchange and account type</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {accountBalances.map((account) => {
+                const structure = account.balance?.account_structure || {};
+                const exchange = account.exchange.toUpperCase();
+                
+                return (
+                  <div key={account.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Wallet className="h-4 w-4 text-primary" />
+                        <span className="font-semibold">{exchange}</span>
+                        <Badge variant="outline">{account.testnet ? 'Testnet' : 'Mainnet'}</Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      {exchange === 'BINANCE' && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Futures:</span>
+                            <span className="font-medium">${structure.futures?.usdt_total?.toFixed(2) || '0.00'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Spot:</span>
+                            <span className="font-medium">${structure.spot?.usdt_total?.toFixed(2) || '0.00'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Funding:</span>
+                            <span className="font-medium">${structure.funding?.usdt_total?.toFixed(2) || '0.00'}</span>
+                          </div>
+                        </>
+                      )}
+                      {exchange === 'OKX' && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Trading:</span>
+                            <span className="font-medium">${structure.trading?.usdt_total?.toFixed(2) || '0.00'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Funding:</span>
+                            <span className="font-medium">${structure.funding?.usdt_total?.toFixed(2) || '0.00'}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="pt-2 border-t flex justify-between">
+                        <span className="font-semibold">Total:</span>
+                        <span className="font-bold">${parseFloat(account.balance?.total_balance || '0').toFixed(2)}</span>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setSelectedTransferAccount(account);
+                        setIsTransferModalOpen(true);
+                      }}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-2" />
+                      Transfer Assets
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      
       {accounts.length > 0 && (
         <Card>
           <CardHeader>
@@ -327,35 +446,17 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Manage your trading setup</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-auto py-4" onClick={() => window.location.href = '/api-keys'}>
-              <div className="flex flex-col items-center space-y-2">
-                <Wallet className="h-5 w-5" />
-                <span>Manage API Keys</span>
-              </div>
-            </Button>
-            <Button variant="outline" className="h-auto py-4" onClick={() => window.location.href = '/strategies'}>
-              <div className="flex flex-col items-center space-y-2">
-                <Target className="h-5 w-5" />
-                <span>View Strategies</span>
-              </div>
-            </Button>
-            <Button variant="outline" className="h-auto py-4" onClick={() => window.location.href = '/webhooks'}>
-              <div className="flex flex-col items-center space-y-2">
-                <TrendingUp className="h-5 w-5" />
-                <span>Setup Webhooks</span>
-              </div>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+
+      {/* Transfer Modal */}
+      {isTransferModalOpen && selectedTransferAccount && (
+        <TransferModal
+          isOpen={isTransferModalOpen}
+          onClose={() => setIsTransferModalOpen(false)}
+          accountId={selectedTransferAccount.id}
+          exchange={selectedTransferAccount.exchange}
+          currentBalances={selectedTransferAccount.balance}
+        />
+      )}
     </div>
   );
 }

@@ -23,3 +23,4 @@ class ApiKey(Base):
 
     # Relationships
     user = relationship("User", back_populates="api_keys")
+    trading_configs = relationship("TradingConfig", back_populates="api_key", cascade="all, delete-orphan")
