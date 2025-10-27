@@ -1,519 +1,175 @@
-# 🤖 TradingBot AI - Triple AI Ensemble Trading System
+# TradingBot AI 사용자 가이드
 
-**AI-powered cryptocurrency trading bot** using **GPT-4, LLaMA 3.1, and ML Models** for intelligent automated trading on **Binance Futures**.
+**AI 기반 암호화폐 자동매매 시스템**
 
----
+TradingBot AI는 TradingView 알림과 연동하여 Binance 및 OKX 거래소에서 자동으로 거래를 실행하는 시스템입니다.
 
-## 🎯 System Overview
+## 🚀 주요 기능
 
-### **Triple AI Ensemble Decision Making**
-- **ML Models (40%)**: LSTM, Transformer, LightGBM
-- **GPT-4 (25%)**: OpenAI advanced analysis
-- **LLaMA 3.1 (25%)**: Meta LLM analysis
-- **Technical Analysis (10%)**: ATR-based signals
+### 📊 6가지 AI 트레이딩 전략
+- **SuperTrend**: 추세 추종 전략
+- **RSI + EMA**: 과매수/과매도 + 이동평균 조합
+- **MACD + Stochastic**: 모멘텀 + 스토캐스틱 조합
+- **Ichimoku Cloud**: 일목균형표 기반 전략
+- **Bollinger Bands + RSI**: 볼린저 밴드 + RSI 조합
+- **EMA Crossover**: 이동평균선 교차 전략
 
-### **Entry Logic**
+### 🔐 보안 시스템
+- **AES-256 암호화**: 거래소 API 키 안전하게 저장
+- **JWT 인증**: 사용자별 격리된 환경
+- **HMAC-SHA256**: Webhook 서명 검증
+- **NextAuth**: 2FA 지원 (TOTP)
+
+### 🎯 TradingView 통합
+- **Pine Script 자동 생성**: 전략을 Pine Script로 변환
+- **Webhook 자동 주문**: TradingView 알림 → 실제 거래
+- **실시간 시그널**: 지연 없이 주문 전송
+
+### 🌐 다중 거래소 지원
+- **Binance Futures**: 레버리지 최대 125배
+- **OKX Futures**: Swap 계약 지원
+- **테스트넷 지원**: 실제 돈 사용 전 연습
+
+### 📈 백테스팅 엔진
+- 과거 데이터 기반 성과 분석
+- 승률, 손익, MDD 계산
+- 파라미터 최적화
+
+## 📖 가이드 구조
+
+### 시작하기
+- [빠른 시작 가이드](getting-started/quick-start.md)
+- [설치 및 설정](getting-started/installation.md)
+- [첫 거래 실행](getting-started/first-trade.md)
+
+### 사용 가이드
+- [API 키 등록](guides/api-keys.md)
+- [Trading Config 설정](guides/trading-config.md)
+- [Webhook 설정](guides/webhook-setup.md)
+- [TradingView 통합](guides/tradingview-integration.md)
+- [전략 선택 가이드](guides/strategy-selection.md)
+
+### 전략 상세
+- [전략 개요](strategies/overview.md)
+- [SuperTrend 전략](strategies/supertrend.md)
+- [RSI + EMA 전략](strategies/rsi-ema.md)
+- [MACD + Stochastic 전략](strategies/macd-stochastic.md)
+- [Ichimoku Cloud 전략](strategies/ichimoku.md)
+- [Bollinger Bands + RSI 전략](strategies/bollinger-rsi.md)
+- [EMA Crossover 전략](strategies/ema-crossover.md)
+
+### 보안
+- [암호화 시스템](security/encryption.md)
+- [보안 모범 사례](security/best-practices.md)
+- [2단계 인증 (2FA)](security/two-factor-auth.md)
+
+### 문제 해결
+- [자주 묻는 질문 (FAQ)](troubleshooting/faq.md)
+- [일반적인 문제](troubleshooting/common-issues.md)
+- [에러 코드 참조](troubleshooting/error-codes.md)
+
+### API 참조
+- [인증](api-reference/authentication.md)
+- [엔드포인트](api-reference/endpoints.md)
+- [Webhook API](api-reference/webhook-api.md)
+
+## ⚠️ 중요 안전 수칙
+
+### 1. 테스트넷으로 시작하세요
 ```
-Probability ≥ 80% AND Confidence ≥ 70% AND Agreement ≥ 70%
-```
-
----
-
-## 📁 Project Structure
-
-```
-trading/
-├── trading-frontend/          # Next.js 15 + React 19 + TypeScript
-│   ├── app/                   # App Router (Next.js 15)
-│   │   ├── (auth)/            # Authentication pages (login, signup, OTP)
-│   │   ├── (protected)/       # Protected dashboard pages
-│   │   └── api/               # API routes (NextAuth, strategies, webhooks)
-│   ├── components/            # React components
-│   ├── lib/                   # Utilities and helpers
-│   ├── prisma/                # Database schema (PostgreSQL)
-│   └── public/                # Static assets
-│
-└── trading-backend/           # FastAPI + Python
-    ├── app/
-    │   ├── ai/                # AI Ensemble system
-    │   │   └── ensemble.py    # Triple AI logic
-    │   ├── api/               # FastAPI routes
-    │   │   └── v1/            # API v1 endpoints
-    │   ├── core/              # Configuration
-    │   ├── database/          # SQLAlchemy setup
-    │   ├── models/            # Database models
-    │   ├── services/          # Binance API client
-    │   └── workers/           # Background workers
-    ├── alembic/               # Database migrations
-    ├── main.py                # FastAPI app entry
-    └── requirements.txt       # Python dependencies
-```
-
----
-
-## 🚀 Quick Start
-
-### **Prerequisites**
-- **Node.js 20+** and **npm/yarn**
-- **Python 3.10+** and **pip**
-- **PostgreSQL 14+**
-- **Redis** (for caching)
-- **Binance Account** (Testnet or Mainnet)
-
----
-
-### **1. Frontend Setup**
-
-```bash
-cd trading-frontend
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your database URL and API keys
-
-# Run database migrations
-npx prisma migrate dev
-
-# Seed default strategies
-npx prisma db seed
-
-# Run development server
-npm run dev
+⛔ 처음부터 실제 거래소 사용 금지
+✅ 반드시 Testnet으로 연습 (최소 1주일)
+✅ 전략 검증 후 실전 투입
 ```
 
-**Frontend runs on**: [http://localhost:3000](http://localhost:3000)
-
----
-
-### **2. Backend Setup**
-
-```bash
-cd trading-backend
-
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# Windows
-venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys
-
-# Run database migrations
-alembic upgrade head
-
-# Run development server
-python main.py
+### 2. 소액으로 시작하세요
+```
+⛔ 전 재산을 투입하지 마세요
+✅ 잃어도 괜찮은 금액만 사용
+✅ 레버리지는 낮게 시작 (5배 이하 권장)
 ```
 
-**Backend runs on**: [http://localhost:8001](http://localhost:8001)
-
----
-
-## 📡 TradingView Webhook Auto-Trading Setup
-
-### **Step 1: Register Exchange API Keys**
-
-Users must register their exchange API keys through the secure endpoint:
-
-```bash
-# Example: Register Binance API
-POST http://localhost:8001/api/v1/accounts-secure/register
-Authorization: Bearer <user_jwt_token>
-
-{
-  "exchange": "binance",
-  "api_key": "your_binance_api_key",
-  "api_secret": "your_binance_api_secret",
-  "testnet": true
-}
+### 3. API 키를 안전하게 관리하세요
+```
+⛔ GitHub, 포럼에 API 키 공개 금지
+⛔ 스크린샷 공유 시 API 키 노출 주의
+✅ IP Whitelist 설정 (거래소 설정)
+✅ 출금 권한은 비활성화
 ```
 
-```bash
-# Example: Register OKX API
-POST http://localhost:8001/api/v1/accounts-secure/register
-Authorization: Bearer <user_jwt_token>
-
-{
-  "exchange": "okx",
-  "api_key": "your_okx_api_key",
-  "api_secret": "your_okx_api_secret",
-  "passphrase": "your_okx_passphrase",
-  "testnet": true
-}
+### 4. 손절/익절을 반드시 설정하세요
+```
+⛔ 손절 없이 거래 금지
+✅ Stop Loss: 2-3% 권장
+✅ Take Profit: 5-10% 권장
+✅ 레버리지가 높을수록 손절폭 좁게
 ```
 
-### **Step 2: Export Pine Script Strategy**
+## 📊 권장 설정
 
-Use the backend's Pine Script export feature:
-
-```bash
-GET http://localhost:8001/api/v1/strategies/pine-export/triple-ai-ensemble
+### 초보자
+```yaml
+투자 금액: 100-500 USDT (테스트넷)
+레버리지: 3-5배
+손절: 3%
+익절: 5%
+전략: SuperTrend (가장 단순)
 ```
 
-This generates a `.pine` file with webhook alert code already included.
-
-### **Step 3: Set Up TradingView Alert**
-
-1. Copy the Pine Script code to TradingView
-2. Create a new alert
-3. In alert settings, set:
-   - **Webhook URL**: `http://your-backend-url/api/v1/webhook/tradingview`
-   - **Message**:
-   ```json
-   {
-     "account_id": "user_account_id",
-     "exchange": "binance",
-     "action": "{{strategy.order.action}}",
-     "symbol": "{{ticker}}",
-     "leverage": 3,
-     "secret": "your_webhook_secret"
-   }
-   ```
-
-### **Step 4: Start Auto-Trading**
-
-Orders are automatically executed when TradingView sends webhook alerts!
-
-**📚 Full Guide**: See [TRADINGVIEW_WEBHOOK_GUIDE.md](trading-backend/TRADINGVIEW_WEBHOOK_GUIDE.md) and [CLAUDE.md](trading-backend/CLAUDE.md)
-
----
-
-## 🔧 Environment Variables
-
-### **Frontend (.env.local)**
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/tradingbot"
-NEXTAUTH_SECRET="your-secret-key"
-NEXTAUTH_URL="http://localhost:3000"
+### 중급자
+```yaml
+투자 금액: 500-2000 USDT
+레버리지: 5-10배
+손절: 2%
+익절: 7%
+전략: RSI + EMA 또는 MACD + Stochastic
 ```
 
-### **Backend (.env)**
-```env
-# Application
-APP_NAME="TradingBot AI Backend"
-DEBUG=True
-API_V1_PREFIX="/api/v1"
-
-# Database
-DATABASE_URL="postgresql://user:password@localhost:5432/tradingbot"
-
-# Binance API
-BINANCE_API_KEY="your-binance-api-key"
-BINANCE_API_SECRET="your-binance-api-secret"
-BINANCE_TESTNET=True
-
-# AI APIs
-OPENAI_API_KEY="your-openai-api-key"
-ANTHROPIC_API_KEY="your-anthropic-api-key"
-
-# Redis
-REDIS_URL="redis://localhost:6379"
-
-# Security
-SECRET_KEY="your-secret-key"
-WEBHOOK_SECRET="generate-with-python-secrets-token_urlsafe-32"
-ENCRYPTION_KEY="generate-with-python-cryptography-fernet-generate_key"
-ALGORITHM="HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# Generate Security Keys:
-# SECRET_KEY: openssl rand -hex 32
-# WEBHOOK_SECRET: python -c "import secrets; print(secrets.token_urlsafe(32))"
-# ENCRYPTION_KEY: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-
-# Trading Parameters
-DEFAULT_LEVERAGE=3
-MAX_POSITION_SIZE_PCT=0.10
-ATR_PERIOD=14
-
-# AI Ensemble Weights
-ML_WEIGHT=0.40
-GPT4_WEIGHT=0.25
-LLAMA_WEIGHT=0.25
-TA_WEIGHT=0.10
-
-# Entry/Exit Thresholds
-MIN_PROBABILITY=0.80
-MIN_CONFIDENCE=0.70
-MIN_AGREEMENT=0.70
+### 고급자
+```yaml
+투자 금액: 2000+ USDT
+레버리지: 10-20배
+손절: 1-2%
+익절: 10-15%
+전략: Ichimoku 또는 커스텀 조합
 ```
 
----
+## 🎓 학습 로드맵
 
-## 🎮 Key Features
+### 1주차: 기본 이해
+- [ ] 시스템 설치 및 회원가입
+- [ ] API 키 등록 (테스트넷)
+- [ ] Trading Config 설정
+- [ ] 첫 Webhook 생성
 
-### **1. Triple AI Ensemble**
-- **ML Models**: LSTM + Transformer + LightGBM for pattern recognition
-- **GPT-4**: Advanced market analysis and reasoning
-- **LLaMA 3.1**: Meta LLM for alternative perspectives
-- **Weighted Voting**: Intelligent decision aggregation
+### 2주차: TradingView 연동
+- [ ] Pine Script 기본 학습
+- [ ] SuperTrend 전략 적용
+- [ ] 알림 설정 및 테스트
+- [ ] 백테스팅으로 검증
 
-### **2. Auto-Trading**
-- **Automated Execution**: Based on AI signals
-- **Risk Management**: ATR-based stop-loss/take-profit
-- **Position Monitoring**: Real-time P&L tracking
-- **Multi-Strategy**: Customizable strategy templates
+### 3주차: 전략 최적화
+- [ ] 다양한 전략 테스트
+- [ ] 파라미터 조정
+- [ ] 승률 및 손익 분석
+- [ ] 최적 설정 발견
 
-### **3. Real-Time Data**
-- **WebSocket Streaming**: Live market data
-- **Position Updates**: Continuous portfolio monitoring
-- **AI Signal Alerts**: Instant notifications
+### 4주차: 실전 투입
+- [ ] 테스트넷 성과 검토
+- [ ] 실제 거래소 API 키 등록
+- [ ] 소액으로 실전 시작
+- [ ] 지속적인 모니터링
 
-### **4. TradingView Webhook Auto-Trading** 🆕
-- **Webhook Integration**: Receive alerts from TradingView Pine Script strategies
-- **Multi-Exchange Support**: Binance Futures + OKX Futures
-- **Secure API Storage**: AES-256 encrypted API keys in database
-- **User Authentication**: JWT + NextAuth session verification
-- **Auto-Execution**: Automatic order placement from TradingView signals
+## 📞 지원
 
-### **5. Backtesting**
-- **Historical Testing**: Validate strategies on past data
-- **Performance Metrics**: Win rate, Sharpe ratio, max drawdown
-- **Equity Curve**: Visual performance analysis
+- **GitHub Issues**: [문제 신고](https://github.com/your-repo/issues)
+- **Discord**: [커뮤니티 참여](#)
+- **이메일**: support@tradingbot.ai
 
-### **6. Gamification**
-- **XP System**: Earn experience from trades
-- **Levels**: Progress through trading milestones
-- **Badges**: Unlock achievements
-- **Leaderboard**: Compete with other traders
+## 📄 라이선스
+
+MIT License - 자유롭게 사용 및 수정 가능
 
 ---
 
-## 📊 Tech Stack
-
-### **Frontend**
-- **Framework**: Next.js 15 (App Router)
-- **UI**: React 19 + TypeScript
-- **Styling**: Tailwind CSS 4 + shadcn/ui
-- **Components**: Radix UI
-- **Forms**: React Hook Form + Zod
-- **Charts**: Recharts + Lightweight Charts
-- **Authentication**: NextAuth v5 (2FA/OTP)
-- **Database**: Prisma ORM + PostgreSQL
-
-### **Backend**
-- **Framework**: FastAPI
-- **Language**: Python 3.10+
-- **Database**: SQLAlchemy + PostgreSQL (async)
-- **Trading**: python-binance + ccxt
-- **AI/ML**: OpenAI + Anthropic + Transformers + PyTorch
-- **Analysis**: pandas + numpy + ta (Technical Analysis)
-- **WebSocket**: websockets + python-socketio
-- **Background Jobs**: Celery
-- **Caching**: Redis
-
----
-
-## 🔐 Security
-
-### **User Data Protection**
-- **AES-256 Encryption**: Exchange API keys encrypted using Fernet (cryptography library)
-- **Environment Secrets**: ENCRYPTION_KEY stored in environment variables
-- **User Authentication**: JWT tokens + NextAuth session verification
-- **Database Storage**: Encrypted credentials stored in PostgreSQL
-
-### **Authentication & Authorization**
-- **2FA Authentication**: TOTP-based OTP for user accounts
-- **JWT Tokens**: Secure session management with configurable expiration
-- **Password Hashing**: bcrypt for user passwords
-- **Protected Routes**: Authentication required for sensitive operations
-
-### **Webhook Security**
-- **HMAC Verification**: TradingView webhook secret validation
-- **Request Validation**: Signature verification using hmac.compare_digest()
-- **Secret Rotation**: Configurable webhook secrets in environment
-
-### **API Key Management**
-- **User-Level Isolation**: Each user's API keys stored separately
-- **Testnet Support**: Separate credentials for testnet/mainnet
-- **Active/Inactive Toggle**: Disable accounts without deletion
-- **Secure Deletion**: Complete removal from database and memory
-
----
-
-## 📈 API Endpoints
-
-### **Authentication**
-- `POST /api/auth/signup` - User registration
-- `POST /api/auth/verify-otp` - OTP verification
-- `POST /api/auth/[...nextauth]` - NextAuth routes
-
-### **Trading**
-- `POST /api/v1/trading/analyze` - AI market analysis
-- `GET /api/v1/trading/positions` - Get open positions
-- `GET /api/v1/trading/balance` - Get account balance
-- `POST /api/v1/trading/trade` - Execute trade
-- `POST /api/v1/trading/close-position` - Close position
-
-### **Strategies**
-- `GET /api/strategies` - List all strategies
-- `GET /api/strategies/configs/my` - User's strategy configs
-- `POST /api/strategies/configs` - Create strategy config
-- `POST /api/strategies/auto-trade/start` - Start auto-trading
-- `POST /api/strategies/auto-trade/stop` - Stop auto-trading
-- `GET /api/strategies/auto-trade/status` - Auto-trading status
-
-### **TradingView Webhooks** 🆕
-- `POST /api/v1/webhook/tradingview` - Receive TradingView webhook alerts
-- Automatic order execution based on Pine Script signals
-
-### **Account Management (Secure)** 🆕
-- `POST /api/v1/accounts-secure/register` - Register exchange API keys (authenticated)
-- `GET /api/v1/accounts-secure/list` - List user's exchange accounts
-- `DELETE /api/v1/accounts-secure/{account_id}` - Delete exchange account
-- `POST /api/v1/accounts-secure/{account_id}/toggle` - Toggle account active status
-
-### **Account Management (Simple)**
-- `POST /api/v1/accounts/binance/register` - Register Binance account (testing only)
-- `POST /api/v1/accounts/okx/register` - Register OKX account (testing only)
-- `GET /api/v1/accounts/{account_id}/status` - Get account status
-- `DELETE /api/v1/accounts/{account_id}` - Delete account
-
-### **WebSocket**
-- `ws://localhost:8001/ws/market/{symbol}` - Market data stream
-- `ws://localhost:8001/ws/positions/{userId}` - Position updates
-
----
-
-## 🎯 Trading Strategy Example
-
-```python
-# Triple AI Ensemble Analysis
-{
-    "should_enter": True,
-    "direction": "LONG",
-    "probability_up": 0.85,  # 85% probability
-    "confidence": 0.78,      # 78% confidence
-    "agreement": 0.75,       # 75% agreement across AIs
-    "entry_price": 65000.0,
-    "stop_loss": 63500.0,
-    "take_profit": 67500.0,
-    "reasoning": "
-        🤖 ML Models (40%): SMA20 > SMA50 indicates bullish trend
-        🧠 GPT-4 (25%): Market structure shows bullish momentum
-        🦙 LLaMA (25%): Volume profile suggests accumulation
-        📊 TA Rules (10%): EMA20=65200, EMA50=64800, ATR=1000
-        ✅ Final: Probability=85%, Confidence=78%, Agreement=75%
-    "
-}
-```
-
----
-
-## 🛠️ Development Status
-
-### ✅ **Completed**
-- ✅ Frontend UI (Next.js 15 + React 19)
-- ✅ Authentication system (NextAuth v5 + 2FA)
-- ✅ Database models (Prisma + SQLAlchemy)
-- ✅ Binance Futures API integration
-- ✅ OKX Futures API integration 🆕
-- ✅ TradingView webhook auto-trading system 🆕
-- ✅ Secure API key management with AES-256 encryption 🆕
-- ✅ Basic AI Ensemble structure
-- ✅ Auto-trader background worker
-- ✅ API routes and endpoints
-- ✅ Pine Script export with webhook alerts 🆕
-
-### 🔄 **In Progress**
-- 🔄 AI Ensemble GPT-4/LLaMA integration
-- 🔄 ML Models (LSTM, Transformer, LightGBM)
-- 🔄 WebSocket real-time data streaming
-- 🔄 Frontend-Backend integration
-
-### 📋 **Planned**
-- 📋 Email notification system
-- 📋 Advanced backtesting engine
-- 📋 Mobile app (React Native)
-- 📋 Multi-exchange support (Bybit, Bitget)
-
----
-
-## 📚 Documentation
-
-### **API Documentation**
-- **Swagger UI**: [http://localhost:8001/docs](http://localhost:8001/docs)
-- **ReDoc**: [http://localhost:8001/redoc](http://localhost:8001/redoc)
-
-### **Developer Guides** 🆕
-- **[CLAUDE.md](trading-backend/CLAUDE.md)** - Complete system architecture and developer documentation
-  - TradingView webhook integration flow
-  - Security system details (AES-256 encryption)
-  - Database schema and relationships
-  - API endpoint reference
-  - Frontend integration examples
-  - Deployment guide
-
-- **[TRADINGVIEW_WEBHOOK_GUIDE.md](trading-backend/TRADINGVIEW_WEBHOOK_GUIDE.md)** - TradingView webhook setup guide
-  - Step-by-step webhook configuration
-  - Pine Script alert setup
-  - Exchange API key registration
-  - Security best practices
-  - Troubleshooting tips
-
----
-
-## ⚠️ Security Warnings
-
-### **🔐 Critical Security Requirements**
-
-1. **NEVER commit API keys to version control**
-   - Always use `.env` files (already in `.gitignore`)
-   - Rotate keys immediately if exposed
-
-2. **Use testnet for development**
-   - Binance Testnet: https://testnet.binancefuture.com
-   - OKX Demo Trading: https://www.okx.com/demo-trading
-
-3. **Production deployment checklist**
-   - [ ] Generate new `ENCRYPTION_KEY` in production
-   - [ ] Generate new `WEBHOOK_SECRET` in production
-   - [ ] Use HTTPS for webhook endpoints
-   - [ ] Enable API key IP restrictions on exchanges
-   - [ ] Set API key permissions to "Enable Futures" only (no withdrawals)
-   - [ ] Use separate API keys for testnet and mainnet
-
-4. **Database security**
-   - API keys are AES-256 encrypted in database
-   - User authentication required for all operations
-   - Keys only decrypted during order execution
-
-### **⚠️ Trading Risks**
-
-**This software is for educational purposes only.** Cryptocurrency trading carries substantial risk of loss. Use at your own risk. Always start with **testnet** before using real funds.
-
-**Important:**
-- Past performance does not guarantee future results
-- AI predictions are not financial advice
-- Always use appropriate position sizing and risk management
-- Never trade with money you cannot afford to lose
-
----
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
----
-
-## 🙏 Acknowledgments
-
-- **OpenAI GPT-4** for advanced AI analysis
-- **Meta LLaMA 3.1** for alternative AI perspective
-- **Binance** for futures trading API
-- **Next.js** and **FastAPI** for excellent frameworks
-
----
-
-**Built with ❤️ by AI Trading Enthusiasts**
+**면책 조항**: 암호화폐 거래는 높은 위험을 수반합니다. 이 시스템을 사용하여 발생하는 모든 손실에 대해 개발자는 책임지지 않습니다. 투자 결정은 본인의 책임 하에 이루어져야 합니다.
